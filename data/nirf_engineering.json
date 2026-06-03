@@ -1,0 +1,596 @@
+[
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology Madras",
+    "nirf_rank": 1,
+    "nirf_score": 88.72
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology Delhi",
+    "nirf_rank": 2,
+    "nirf_score": 85.74
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology Bombay",
+    "nirf_rank": 3,
+    "nirf_score": 83.65
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology Kanpur",
+    "nirf_rank": 4,
+    "nirf_score": 81.82
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology Kharagpur",
+    "nirf_rank": 5,
+    "nirf_score": 78.69
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology Roorkee",
+    "nirf_rank": 6,
+    "nirf_score": 75.44
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology Hyderabad",
+    "nirf_rank": 7,
+    "nirf_score": 72.31
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology Guwahati",
+    "nirf_rank": 8,
+    "nirf_score": 72.24
+  },
+  {
+    "year": 2025,
+    "institute_name": "National Institute of Technology Tiruchirappalli",
+    "nirf_rank": 9,
+    "nirf_score": 68.14
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology (Banaras Hindu University) Varanasi",
+    "nirf_rank": 10,
+    "nirf_score": 67.24
+  },
+  {
+    "year": 2025,
+    "institute_name": "Birla Institute of Technology",
+    "nirf_rank": 11,
+    "nirf_score": 67.02
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology Indore",
+    "nirf_rank": 12,
+    "nirf_score": 66.65
+  },
+  {
+    "year": 2025,
+    "institute_name": "National Institute of Technology Rourkela",
+    "nirf_rank": 13,
+    "nirf_score": 66.62
+  },
+  {
+    "year": 2025,
+    "institute_name": "S.R.M. Institute of Science and Technology",
+    "nirf_rank": 14,
+    "nirf_score": 65.83
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology (Indian School of Mines)",
+    "nirf_rank": 15,
+    "nirf_score": 65.37
+  },
+  {
+    "year": 2025,
+    "institute_name": "Vellore Institute of Technology",
+    "nirf_rank": 16,
+    "nirf_score": 65.25
+  },
+  {
+    "year": 2025,
+    "institute_name": "National Institute of Technology Karnataka, Surathkal",
+    "nirf_rank": 17,
+    "nirf_score": 64.59
+  },
+  {
+    "year": 2025,
+    "institute_name": "Jadavpur University",
+    "nirf_rank": 18,
+    "nirf_score": 64.54
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology Patna",
+    "nirf_rank": 19,
+    "nirf_score": 64.52
+  },
+  {
+    "year": 2025,
+    "institute_name": "Anna University",
+    "nirf_rank": 20,
+    "nirf_score": 63.51
+  },
+  {
+    "year": 2025,
+    "institute_name": "National Institute of Technology Calicut",
+    "nirf_rank": 21,
+    "nirf_score": 63.05
+  },
+  {
+    "year": 2025,
+    "institute_name": "Siksha `O` Anusandhan",
+    "nirf_rank": 22,
+    "nirf_score": 62.58
+  },
+  {
+    "year": 2025,
+    "institute_name": "Amrita Vishwa Vidyapeetham",
+    "nirf_rank": 23,
+    "nirf_score": 62.46
+  },
+  {
+    "year": 2025,
+    "institute_name": "Jamia Millia Islamia",
+    "nirf_rank": 24,
+    "nirf_score": 62.42
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology Gandhinagar",
+    "nirf_rank": 25,
+    "nirf_score": 62.31
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology Mandi",
+    "nirf_rank": 26,
+    "nirf_score": 62.08
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology Jodhpur",
+    "nirf_rank": 27,
+    "nirf_score": 61.31
+  },
+  {
+    "year": 2025,
+    "institute_name": "National Institute of Technology Warangal",
+    "nirf_rank": 28,
+    "nirf_score": 61.05
+  },
+  {
+    "year": 2025,
+    "institute_name": "Thapar Institute of Engineering and Technology (Deemed-to-be-university)",
+    "nirf_rank": 29,
+    "nirf_score": 60.97
+  },
+  {
+    "year": 2025,
+    "institute_name": "Delhi Technological University",
+    "nirf_rank": 30,
+    "nirf_score": 60.85
+  },
+  {
+    "year": 2025,
+    "institute_name": "Chandigarh University",
+    "nirf_rank": 31,
+    "nirf_score": 60.46
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology Ropar",
+    "nirf_rank": 32,
+    "nirf_score": 59.66
+  },
+  {
+    "year": 2025,
+    "institute_name": "Kalasalingam Academy of Research and Education",
+    "nirf_rank": 33,
+    "nirf_score": 59.03
+  },
+  {
+    "year": 2025,
+    "institute_name": "Aligarh Muslim University",
+    "nirf_rank": 34,
+    "nirf_score": 59.01
+  },
+  {
+    "year": 2025,
+    "institute_name": "Koneru Lakshmaiah Education Foundation University (K L College of Engineering)",
+    "nirf_rank": 35,
+    "nirf_score": 58.95
+  },
+  {
+    "year": 2025,
+    "institute_name": "Kalinga Institute of Industrial Technology",
+    "nirf_rank": 36,
+    "nirf_score": 58.79
+  },
+  {
+    "year": 2025,
+    "institute_name": "Amity University",
+    "nirf_rank": 37,
+    "nirf_score": 58.53
+  },
+  {
+    "year": 2025,
+    "institute_name": "International Institute of Information Technology Hyderabad",
+    "nirf_rank": 38,
+    "nirf_score": 58.45
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology Bhubaneswar",
+    "nirf_rank": 39,
+    "nirf_score": 58.22
+  },
+  {
+    "year": 2025,
+    "institute_name": "Shanmugha Arts Science Technology & Research Academy",
+    "nirf_rank": 40,
+    "nirf_score": 58.02
+  },
+  {
+    "year": 2025,
+    "institute_name": "Institute of Chemical Technology",
+    "nirf_rank": 41,
+    "nirf_score": 57.96
+  },
+  {
+    "year": 2025,
+    "institute_name": "Malaviya National Institute of Technology",
+    "nirf_rank": 42,
+    "nirf_score": 57.45
+  },
+  {
+    "year": 2025,
+    "institute_name": "UPES",
+    "nirf_rank": 43,
+    "nirf_score": 56.99
+  },
+  {
+    "year": 2025,
+    "institute_name": "Visvesvaraya National Institute of Technology, Nagpur",
+    "nirf_rank": 44,
+    "nirf_score": 56.58
+  },
+  {
+    "year": 2025,
+    "institute_name": "Saveetha Institute of Medical and Technical Sciences",
+    "nirf_rank": 45,
+    "nirf_score": 56.55
+  },
+  {
+    "year": 2025,
+    "institute_name": "Symbiosis International",
+    "nirf_rank": 46,
+    "nirf_score": 56.22
+  },
+  {
+    "year": 2025,
+    "institute_name": "Sri Sivasubramaniya Nadar College of Engineering",
+    "nirf_rank": 47,
+    "nirf_score": 56.08
+  },
+  {
+    "year": 2025,
+    "institute_name": "Lovely Professional University",
+    "nirf_rank": 48,
+    "nirf_score": 55.99
+  },
+  {
+    "year": 2025,
+    "institute_name": "National Institute of Technology Durgapur",
+    "nirf_rank": 49,
+    "nirf_score": 55.94
+  },
+  {
+    "year": 2025,
+    "institute_name": "National Institute of Technology Silchar",
+    "nirf_rank": 50,
+    "nirf_score": 55.91
+  },
+  {
+    "year": 2025,
+    "institute_name": "Graphic Era University",
+    "nirf_rank": 52,
+    "nirf_score": 55.26
+  },
+  {
+    "year": 2025,
+    "institute_name": "National Institute of Technology Patna",
+    "nirf_rank": 53,
+    "nirf_score": 53.89
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Engineering Science and Technology, Shibpur",
+    "nirf_rank": 54,
+    "nirf_score": 53.63
+  },
+  {
+    "year": 2025,
+    "institute_name": "Dr. B R Ambedkar National Institute of Technology, Jalandhar",
+    "nirf_rank": 55,
+    "nirf_score": 53.38
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology Jammu",
+    "nirf_rank": 56,
+    "nirf_score": 53.08
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology, Tirupati",
+    "nirf_rank": 57,
+    "nirf_score": 52.73
+  },
+  {
+    "year": 2025,
+    "institute_name": "Manipal University Jaipur",
+    "nirf_rank": 58,
+    "nirf_score": 52.69
+  },
+  {
+    "year": 2025,
+    "institute_name": "Manipal Institute of Technology",
+    "nirf_rank": 59,
+    "nirf_score": 52.55
+  },
+  {
+    "year": 2025,
+    "institute_name": "Madan Mohan Malaviya University of Technology",
+    "nirf_rank": 60,
+    "nirf_score": 52.45
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Space Science and Technology",
+    "nirf_rank": 61,
+    "nirf_score": 52.44
+  },
+  {
+    "year": 2025,
+    "institute_name": "Motilal Nehru National Institute of Technology",
+    "nirf_rank": 62,
+    "nirf_score": 52.15
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indraprastha Institute of Information Technology",
+    "nirf_rank": 63,
+    "nirf_score": 51.33
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology Palakkad",
+    "nirf_rank": 64,
+    "nirf_score": 51.2
+  },
+  {
+    "year": 2025,
+    "institute_name": "National Institute of Technology Delhi",
+    "nirf_rank": 65,
+    "nirf_score": 50.79
+  },
+  {
+    "year": 2025,
+    "institute_name": "Sardar Vallabhbhai National Institute of Technology",
+    "nirf_rank": 66,
+    "nirf_score": 50.77
+  },
+  {
+    "year": 2025,
+    "institute_name": "Sathyabama Institute of Science and Technology",
+    "nirf_rank": 67,
+    "nirf_score": 50.64
+  },
+  {
+    "year": 2025,
+    "institute_name": "PSG College of Technology",
+    "nirf_rank": 67,
+    "nirf_score": 50.64
+  },
+  {
+    "year": 2025,
+    "institute_name": "International Institute of Information Technology Bangalore",
+    "nirf_rank": 69,
+    "nirf_score": 50.46
+  },
+  {
+    "year": 2025,
+    "institute_name": "Netaji Subhas University of Technology (NSUT)",
+    "nirf_rank": 70,
+    "nirf_score": 50.43
+  },
+  {
+    "year": 2025,
+    "institute_name": "Banasthali Vidyapith",
+    "nirf_rank": 71,
+    "nirf_score": 50.38
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology Bhilai",
+    "nirf_rank": 72,
+    "nirf_score": 50.37
+  },
+  {
+    "year": 2025,
+    "institute_name": "National Institute of Technology Srinagar",
+    "nirf_rank": 73,
+    "nirf_score": 50.23
+  },
+  {
+    "year": 2025,
+    "institute_name": "University of Hyderabad",
+    "nirf_rank": 74,
+    "nirf_score": 49.36
+  },
+  {
+    "year": 2025,
+    "institute_name": "M. S. Ramaiah Institute of Technology",
+    "nirf_rank": 75,
+    "nirf_score": 49.26
+  },
+  {
+    "year": 2025,
+    "institute_name": "Christ University",
+    "nirf_rank": 76,
+    "nirf_score": 49.03
+  },
+  {
+    "year": 2025,
+    "institute_name": "Indian Institute of Technology Dharwad",
+    "nirf_rank": 77,
+    "nirf_score": 48.61
+  },
+  {
+    "year": 2025,
+    "institute_name": "Rajiv Gandhi Institute of Petroleum Technology",
+    "nirf_rank": 78,
+    "nirf_score": 48.52
+  },
+  {
+    "year": 2025,
+    "institute_name": "Sant Longowal Institute of Engineering & Technology",
+    "nirf_rank": 79,
+    "nirf_score": 48.42
+  },
+  {
+    "year": 2025,
+    "institute_name": "Vignan's Foundation for Science, Technology and Research",
+    "nirf_rank": 80,
+    "nirf_score": 48.27
+  },
+  {
+    "year": 2025,
+    "institute_name": "Maulana Azad National Institute of Technology",
+    "nirf_rank": 81,
+    "nirf_score": 48.26
+  },
+  {
+    "year": 2025,
+    "institute_name": "National Institute of Technology, Jamshedpur",
+    "nirf_rank": 82,
+    "nirf_score": 48.25
+  },
+  {
+    "year": 2025,
+    "institute_name": "National Institute of Technology Meghalaya",
+    "nirf_rank": 83,
+    "nirf_score": 48.21
+  },
+  {
+    "year": 2025,
+    "institute_name": "Jain university,Bangalore",
+    "nirf_rank": 84,
+    "nirf_score": 48.01
+  },
+  {
+    "year": 2025,
+    "institute_name": "National Institute of Technology Kurukshetra",
+    "nirf_rank": 85,
+    "nirf_score": 47.98
+  },
+  {
+    "year": 2025,
+    "institute_name": "National Institute of Technology, Raipur",
+    "nirf_rank": 86,
+    "nirf_score": 47.59
+  },
+  {
+    "year": 2025,
+    "institute_name": "Vel Tech Rangarajan Dr. Sagunthala R & D Institute of Science and Technology",
+    "nirf_rank": 87,
+    "nirf_score": 47.43
+  },
+  {
+    "year": 2025,
+    "institute_name": "AU College of Engineering (A)",
+    "nirf_rank": 88,
+    "nirf_score": 47.37
+  },
+  {
+    "year": 2025,
+    "institute_name": "Chitkara",
+    "nirf_rank": 89,
+    "nirf_score": 47.34
+  },
+  {
+    "year": 2025,
+    "institute_name": "COEP Technological University",
+    "nirf_rank": 90,
+    "nirf_score": 47.31
+  },
+  {
+    "year": 2025,
+    "institute_name": "SR University",
+    "nirf_rank": 91,
+    "nirf_score": 47.16
+  },
+  {
+    "year": 2025,
+    "institute_name": "Defence Institute of Advanced Technology",
+    "nirf_rank": 92,
+    "nirf_score": 46.98
+  },
+  {
+    "year": 2025,
+    "institute_name": "Panjab University",
+    "nirf_rank": 93,
+    "nirf_score": 46.9
+  },
+  {
+    "year": 2025,
+    "institute_name": "Jawaharlal Nehru Technological University",
+    "nirf_rank": 94,
+    "nirf_score": 46.74
+  },
+  {
+    "year": 2025,
+    "institute_name": "C.V. Raman Global University, Odisha",
+    "nirf_rank": 95,
+    "nirf_score": 46.62
+  },
+  {
+    "year": 2025,
+    "institute_name": "Atal Bihari Vajpayee Indian Institute of Information Technology and Management",
+    "nirf_rank": 96,
+    "nirf_score": 46.25
+  },
+  {
+    "year": 2025,
+    "institute_name": "National Institute of Technology Hamirpur",
+    "nirf_rank": 97,
+    "nirf_score": 46.1
+  },
+  {
+    "year": 2025,
+    "institute_name": "Pandit Deendayal Energy University",
+    "nirf_rank": 98,
+    "nirf_score": 45.97
+  },
+  {
+    "year": 2025,
+    "institute_name": "National Institute of Technology Puducherry",
+    "nirf_rank": 99,
+    "nirf_score": 45.83
+  },
+  {
+    "year": 2025,
+    "institute_name": "Sri Krishna College of Engineering and Technology",
+    "nirf_rank": 100,
+    "nirf_score": 45.55
+  }
+]
