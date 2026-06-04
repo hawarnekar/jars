@@ -136,10 +136,16 @@ class RecoEngine:
 
 
 def load_data(paths: Paths | None = None) -> RecoEngine:
-    """Load cutoffs + NIRF + meta from disk into a ready-to-use engine."""
+    """Load cutoffs + NIRF + meta from disk into a ready-to-use engine.
+
+    If a cached ``name_map.json`` exists it is loaded directly, skipping the O(N²)
+    fuzzy-matching pass. The cache is regenerated automatically by ``update_database``.
+    """
     paths = paths or Paths.resolve()
+    nirf_lookup_cache = storage.load_name_map(paths)
     return RecoEngine(
         cutoffs=storage.load_cutoffs(paths),
         nirf=storage.load_nirf(paths),
         meta=storage.read_meta(paths),
+        _nirf_lookup=nirf_lookup_cache or {},
     )

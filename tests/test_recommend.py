@@ -12,6 +12,7 @@ from jars_lib.recommend import (
     _W_CLOSING,
     _W_NIRF,
     _W_OPENING,
+    _closing_trend,
     feasibility,
     recommend as recommend_fn,
 )
@@ -293,6 +294,109 @@ def test_score_well_ranked_institute_beats_unranked():
     )
     assert [r.cutoff.institute_name for r in recs] == ["Ranked", "Unranked"]
     assert recs[1].score == pytest.approx(_W_CLOSING + _W_OPENING)  # unranked: g_nirf = 0
+
+
+# --------------------------------------------- 1.2 feasibility extreme-input (§5 gap)
+
+def test_feasibility_extreme_inputs_no_overflow():
+    assert 0.0 <= feasibility(10**9, 1) <= 1.0      # huge rank vs tiny cutoff
+    assert feasibility(10**9, 1) < 0.5              # definitely a reach
+    assert feasibility(1, 10**9) > 0.99             # tiny rank vs huge cutoff → near-certain
+
+# ---------------------------------------------------------- 4.4 closing-rank trend
+
+def test_closing_trend_single_year_returns_stable():
+    rows = [(2025, 6, None, 5000)]
+    assert _closing_trend(rows) == "stable"
+
+
+def test_closing_trend_easing():
+    # Closing rank rising year-on-year → program becoming more accessible.
+    rows = [(2025, 6, None, 6000), (2024, 6, None, 5000), (2023, 6, None, 4000)]
+    assert _closing_trend(rows) == "easing"
+
+
+def test_closing_trend_tighter():
+    # Closing rank falling year-on-year → program getting more competitive.
+    rows = [(2025, 6, None, 4000), (2024, 6, None, 5000), (2023, 6, None, 6000)]
+    assert _closing_trend(rows) == "tighter"
+
+
+def test_closing_trend_stable():
+    # Near-flat change < 3%/yr → stable.
+    rows = [(2025, 6, None, 5000), (2024, 6, None, 5050), (2023, 6, None, 5020)]
+    assert _closing_trend(rows) == "stable"
+
+
+def test_trend_propagated_to_recommendation():
+    rows = [
+        (2025, 6, "NIT", "Inst A", "P", "OS", "OPEN", GENDER_NEUTRAL, 100, 4000),
+        (2024, 6, "NIT", "Inst A", "P", "OS", "OPEN", GENDER_NEUTRAL, 100, 5000),
+        (2023, 6, "NIT", "Inst A", "P", "OS", "OPEN", GENDER_NEUTRAL, 100, 6000),
+    ]
+    recs = recommend_fn(4500, 1000, data=_make_df(rows))
+    assert len(recs) == 1
+    assert recs[0].closing_rank_trend == "tighter"  # 4000 < 5000 < 6000: tightening
+
+
+# --------------------------------------------------- 3.1 name-map cache (storage + engine)
+
+def test_name_map_round_trip(tmp_path):
+    from jars_lib import storage
+    from jars_lib.config import Paths
+
+    paths = Paths(root=tmp_path)
+    lookup = {"IIT Bombay": (3, 83.0), "NIT Trichy": (9, 66.0)}
+    storage.save_name_map(lookup, paths)
+    loaded = storage.load_name_map(paths)
+    assert loaded == lookup
+
+
+def test_name_map_absent_returns_none(tmp_path):
+    from jars_lib import storage
+    from jars_lib.config import Paths
+
+    assert storage.load_name_map(Paths(root=tmp_path)) is None
+
+
+def test_name_map_corrupt_returns_none(tmp_path):
+    from jars_lib import storage
+    from jars_lib.config import Paths
+
+    paths = Paths(root=tmp_path)
+    paths.name_map.write_text("not json")
+    assert storage.load_name_map(paths) is None
+
+
+def test_load_data_uses_cached_name_map(tmp_path):
+    from jars_lib import storage
+    from jars_lib.config import Paths
+    from jars_lib.engine import load_data
+    from jars_lib.fixtures import cutoffs_df, nirf_scores as nirf_scores_fn
+
+    paths = Paths(root=tmp_path)
+    storage.save_cutoffs(cutoffs_df(), paths)
+    storage.save_nirf(nirf_scores_fn(), paths)
+    # Pre-build and cache the lookup.
+    from jars_lib.match import nirf_lookup
+    df = storage.load_cutoffs(paths)
+    names = df["institute_name"].dropna().astype(str).tolist()
+    lookup = nirf_lookup(names, storage.load_nirf(paths))
+    storage.save_name_map(lookup, paths)
+
+    eng = load_data(paths)
+    # Engine should have used the cached map without recomputing.
+    assert eng._nirf_lookup == lookup
+
+
+def test_seed_demo_creates_name_map(tmp_path):
+    from jars_lib import storage
+    from jars_lib.config import Paths
+    from jars_lib.update import seed_demo
+
+    paths = Paths(root=tmp_path)
+    seed_demo(paths)
+    assert storage.load_name_map(paths) is not None
 
 
 # ---------------------------------------------------------------- 1.1 empty-scrape guard

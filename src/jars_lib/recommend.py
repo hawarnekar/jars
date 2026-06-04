@@ -163,6 +163,37 @@ def _order_key(rec: Recommendation) -> tuple[float, float, float, float]:
     return (-rec.score, nirf, closing, opening)
 
 
+def _closing_trend(years_rows: list[tuple[int, int, int | None, int]]) -> str | None:
+    """Trend direction of the closing rank across up to 5 most recent data years.
+
+    Uses an ordinary least-squares slope of ``(year, closing_rank)``. A positive slope
+    means the cutoff rank is rising over time (program becoming **more accessible** — fewer
+    candidates are picking it). A negative slope means the cutoff is falling (program
+    becoming **more competitive**). Returns ``None`` when fewer than 2 data years exist.
+
+    Threshold: ≥ 3% per year relative change is "easing" / "tighter"; below that is
+    "stable". The threshold filters year-to-year noise in small data windows.
+    """
+    pts = [(y, c) for y, _r, _o, c in years_rows[:5]]
+    if len(pts) < 2:
+        return "stable"
+    n = len(pts)
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    x_mean = sum(xs) / n
+    y_mean = sum(ys) / n
+    denom = sum((x - x_mean) ** 2 for x in xs)
+    if denom == 0:
+        return "stable"
+    slope = sum((x - x_mean) * (y - y_mean) for x, y in zip(xs, ys)) / denom
+    rel = slope / y_mean  # relative change per year
+    if rel > 0.03:
+        return "easing"   # cutoff moving up → easier to get in
+    if rel < -0.03:
+        return "tighter"  # cutoff moving down → harder to get in
+    return "stable"
+
+
 def _gender_pool(gender: str) -> set[str]:
     """Seat-pool genders a candidate may compete in.
 
@@ -347,6 +378,8 @@ def recommend(
         nirf_rank = nirf[0] if nirf else None
         nirf_score = nirf[1] if nirf else None
 
+        trend = _closing_trend(years_rows)
+
         recent_year, recent_round, recent_open, recent_close = years_rows[0]
         cutoff = Cutoff(
             year=recent_year,
@@ -374,6 +407,7 @@ def recommend(
                 closing_rank_max_year=closing_max_year,
                 rank_closing=rank_closing,
                 rank_opening=rank_opening,
+                closing_rank_trend=trend,
             )
         )
 

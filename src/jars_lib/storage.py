@@ -138,6 +138,36 @@ def load_nirf(paths: Paths | None = None) -> list[NirfScore]:
     return out
 
 
+# ------------------------------------------------------------------------ name map
+
+
+def save_name_map(
+    lookup: dict[str, tuple[int, float]], paths: Paths | None = None
+) -> None:
+    """Persist the josaa_name → (nirf_rank, nirf_score) lookup so future load_data()
+    calls can skip the O(N²) fuzzy-matching pass entirely."""
+    paths = paths or Paths.resolve()
+    paths.ensure()
+    payload = {name: list(pair) for name, pair in lookup.items()}
+    _atomic_write_json(paths.name_map, payload)
+
+
+def load_name_map(
+    paths: Paths | None = None,
+) -> dict[str, tuple[int, float]] | None:
+    """Load the cached name map, or return ``None`` if absent/unreadable (triggers
+    on-the-fly fuzzy matching as a fallback)."""
+    paths = paths or Paths.resolve()
+    if not paths.name_map.exists():
+        return None
+    try:
+        raw = json.loads(paths.name_map.read_text())
+        return {name: (int(pair[0]), float(pair[1])) for name, pair in raw.items()}
+    except Exception as exc:
+        log.warning("name_map.json unreadable (%s); will recompute fuzzy lookup.", exc)
+        return None
+
+
 # ---------------------------------------------------------------------------- meta
 
 

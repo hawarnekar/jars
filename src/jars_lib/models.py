@@ -84,6 +84,7 @@ class Recommendation:
     rank_closing: float | None = None
     rank_opening: float | None = None
     score: float = 0.0
+    closing_rank_trend: str | None = None
 
     @property
     def band_in_range(self) -> bool:
@@ -114,5 +115,6 @@ class Recommendation:
             closing_rank_max_year=self.closing_rank_max_year,
             rank_closing=round(self.rank_closing, 1) if self.rank_closing is not None else None,
             rank_opening=round(self.rank_opening, 1) if self.rank_opening is not None else None,
+            closing_rank_trend=self.closing_rank_trend,
         )
         return d

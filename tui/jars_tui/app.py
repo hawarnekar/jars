@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import textwrap
 
+import logging
+
 from jars_lib import load_data
 from jars_lib.constants import GENDER_FEMALE, GENDER_NEUTRAL, INSTITUTE_TYPES, SEAT_TYPES
 from jars_lib.engine import RecoEngine
@@ -41,6 +43,7 @@ _NARROW_COLUMNS = [
     ("Years",    18),  # years the rank was in range, recent→old
     ("NIRF",      5),
     ("Chance",    7),  # recency-weighted admit likelihood, as a %
+    ("Trend",     7),  # closing-rank trend: easing / tighter / stable
 ]
 
 # Bounds for the two flexible text columns.
@@ -287,6 +290,7 @@ class RecoApp(App):
                 _fmt_years(r.band_years, reach=not r.band_in_range),
                 str(r.nirf_rank or "-"),
                 f"{r.feasibility * 100:.0f}%",
+                r.closing_rank_trend or "-",
                 height=row_height,
             )
 
@@ -302,6 +306,7 @@ class RecoApp(App):
         try:
             update_database(progress=progress)
         except Exception as exc:  # noqa: BLE001
+            logging.getLogger("jars_tui").exception("Update failed")
             self.call_from_thread(
                 self.notify, f"Update failed: {exc}", severity="error", timeout=10
             )

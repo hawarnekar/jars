@@ -13,6 +13,7 @@ import pandas as pd
 from . import storage
 from .config import Paths
 from .constants import CUTOFF_COLUMNS
+from .match import nirf_lookup as _nirf_lookup
 from .scrape.errors import ScrapeError
 from .scrape.nirf import scrape_nirf
 
@@ -135,6 +136,14 @@ def update_database(
             log.exception("NIRF scrape failed; keeping existing NIRF data.")
             say(f"NIRF scrape failed ({exc}); keeping existing NIRF data.")
 
+    # Cache the NIRF name-map so future load_data() calls skip the fuzzy-match pass.
+    nirf_scores = storage.load_nirf(paths)
+    if nirf_scores and not final_df.empty:
+        names = final_df["institute_name"].dropna().astype(str).tolist()
+        lookup = _nirf_lookup(names, nirf_scores)
+        storage.save_name_map(lookup, paths)
+        say(f"Name map cached ({len(lookup)} matches).")
+
     meta = storage.update_meta(
         paths,
         years=sorted({int(y) for y in final_df["year"].dropna().tolist()}) or years,
@@ -195,8 +204,11 @@ def seed_demo(paths: Paths | None = None) -> dict:
 
     paths = (paths or Paths.resolve()).ensure()
     df = cutoffs_df()
+    nirf = nirf_scores()
     storage.save_cutoffs(df, paths)
-    storage.save_nirf(nirf_scores(), paths)
+    storage.save_nirf(nirf, paths)
+    names = df["institute_name"].dropna().astype(str).tolist()
+    storage.save_name_map(_nirf_lookup(names, nirf), paths)
     return storage.update_meta(
         paths,
         source="demo",

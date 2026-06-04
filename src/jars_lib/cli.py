@@ -105,7 +105,7 @@ def _fmt_years(years, reach: bool = False) -> str:
 
 
 def _print_table(recs) -> None:
-    headers = ["#", "Institute", "Program", "Category", "Quota", "Open", "Close", "Years", "NIRF", "Chance"]
+    headers = ["#", "Institute", "Program", "Category", "Quota", "Open", "Close", "Years", "NIRF", "Chance", "Trend"]
     rows = []
     for i, r in enumerate(recs, 1):
         c = r.cutoff
@@ -121,6 +121,7 @@ def _print_table(recs) -> None:
                 _fmt_years(r.band_years, reach=not r.band_in_range),
                 str(r.nirf_rank or "-"),
                 f"{r.feasibility * 100:.0f}%",
+                r.closing_rank_trend or "-",
             ]
         )
     widths = [max(len(h), *(len(row[i]) for row in rows)) for i, h in enumerate(headers)]
@@ -181,7 +182,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-v", "--verbose", action="store_true", help="enable info logging")
     sub = p.add_subparsers(dest="command", required=True)
 
-    r = sub.add_parser("recommend", help="print ranked suggestions")
+    r = sub.add_parser(
+        "recommend",
+        help="print ranked suggestions",
+        epilog=(
+            "If no data is loaded yet, run `jars-lib seed-demo` (bundled demo, no network) "
+            "or `jars-lib update` (live JoSAA data) first."
+        ),
+    )
     r.add_argument(
         "--adv-rank", type=int, default=None, metavar="RANK",
         help="JEE Advanced rank (for IIT recommendations)",
