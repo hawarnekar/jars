@@ -9,7 +9,7 @@
  * order here so that fully-tied results break ties identically to Python.
  */
 
-import type { RawDataset } from "./types";
+import type { Cutoff, RawDataset } from "./types";
 
 export interface ProgramGroup {
   instituteType: string;
@@ -29,12 +29,26 @@ export class Dataset {
   readonly meta: RawDataset["meta"];
   readonly dict: RawDataset["dict"];
   readonly groups: ProgramGroup[];
+  private readonly byIdentity: Map<string, ProgramGroup>;
 
   constructor(raw: RawDataset) {
     this.meta = raw.meta;
     this.dict = raw.dict;
     this.groups = buildGroups(raw);
+    this.byIdentity = new Map(this.groups.map((g) => [identityOf(g), g]));
   }
+
+  /** The full per-year history behind a recommendation, for the row-detail view. */
+  yearsFor(cutoff: Cutoff): ProgramGroup["years"] {
+    const g = this.byIdentity.get(
+      `${cutoff.institute_type}|${cutoff.institute_name}|${cutoff.program_name}|${cutoff.quota}|${cutoff.seat_type}|${cutoff.gender}`,
+    );
+    return g ? g.years : [];
+  }
+}
+
+function identityOf(g: ProgramGroup): string {
+  return `${g.instituteType}|${g.instituteName}|${g.programName}|${g.quota}|${g.seatType}|${g.gender}`;
 }
 
 function buildGroups(raw: RawDataset): ProgramGroup[] {

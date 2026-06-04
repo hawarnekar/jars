@@ -3,6 +3,7 @@ import { recommend } from "./engine";
 import type { Recommendation } from "./engine";
 import { useDataset } from "./hooks/useDataset";
 import { FilterForm } from "./components/FilterForm";
+import { ResultsView } from "./components/ResultsView";
 import {
   DEFAULT_FILTERS,
   isValidationError,
@@ -76,24 +77,23 @@ export default function App() {
                 Enter your rank and press <strong>Recommend</strong> to see matching programs.
               </p>
             )}
-            {results !== null && (
+            {results !== null && dataset && (
               <>
                 <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">
                   {results.length} matching {results.length === 1 ? "program" : "programs"}
+                  {results.length > 0 && (
+                    <span className="text-slate-400"> · click a row for year-by-year detail</span>
+                  )}
                 </p>
-                {/* Phase 4 replaces this with the full sortable results table. */}
-                <ul className="space-y-1 text-sm">
-                  {results.slice(0, 20).map((r, i) => (
-                    <li
-                      key={i}
-                      className="rounded border border-slate-200 px-3 py-2 dark:border-slate-800"
-                    >
-                      <span className="font-medium">{r.cutoff.institute_name}</span> —{" "}
-                      {r.cutoff.program_name} · close {r.closing_rank_max} · NIRF{" "}
-                      {r.nirf_rank ?? "—"} · {(r.feasibility * 100).toFixed(0)}%
-                    </li>
-                  ))}
-                </ul>
+                {results.length === 0 ? (
+                  <p className="rounded-md bg-slate-100 px-4 py-3 text-sm text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                    No programs matched. Try widening the ± range, changing the category, or
+                    checking that you entered the right rank (Advanced for IITs, Mains for the
+                    rest).
+                  </p>
+                ) : (
+                  <ResultsView results={results} dataset={dataset} />
+                )}
               </>
             )}
           </section>
