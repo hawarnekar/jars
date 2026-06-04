@@ -1,8 +1,9 @@
 """Textual TUI for the JEE admission recommender.
 
-Layout: an input form (rank, +/- range, category, gender, home state, institute types,
-alpha) on the left, a sortable results table on the right. Keys: Enter/`r` to recommend,
-`u` to update the database from the web, `q` to quit.
+Layout: an input form (rank, +/- range, category, gender, home state, institute types)
+on the left, a results table on the right ranked by a weighted score (NIRF rank, then
+closing rank, then opening rank). Keys: Enter/`r` to recommend, `u` to update the database
+from the web, `q` to quit.
 """
 
 from __future__ import annotations
@@ -10,9 +11,9 @@ from __future__ import annotations
 import textwrap
 
 from jars_lib import load_data
-from jars_lib.config import DEFAULT_ALPHA
 from jars_lib.constants import GENDER_FEMALE, GENDER_NEUTRAL, INSTITUTE_TYPES, SEAT_TYPES
 from jars_lib.engine import RecoEngine
+from jars_lib.storage import empty_cutoffs
 from jars_lib.update import update_database
 
 from textual import on, work
@@ -33,15 +34,13 @@ from textual.widgets import (
 # Fixed-width columns (label, width). Institute & Program are sized dynamically from the
 # remaining table width and wrap onto multiple lines when space is tight.
 _NARROW_COLUMNS = [
-    ("Rank",  5),  # "Adv" or "Mains"
-    ("Type",  4),  # "IIT" / "NIT" / …
-    ("Cat",  13),  # fits "OBC-NCL (PwD)"
-    ("Quota", 6),
-    ("Open",  7),
-    ("Close", 7),
-    ("NIRF",  5),
-    ("Feas",  5),
-    ("Score", 6),
+    ("Category", 13),  # seat type — fits "OBC-NCL (PwD)"
+    ("Quota",     6),
+    ("Open",     13),  # smallest opening rank across years, with its year
+    ("Close",    13),  # largest closing rank across years, with its year
+    ("Years",    18),  # years the rank was in range, recent→old
+    ("NIRF",      5),
+    ("Chance",    7),  # recency-weighted admit likelihood, as a %
 ]
 
 # Bounds for the two flexible text columns.
@@ -59,6 +58,25 @@ def _wrap_cell(text: str, width: int) -> list[str]:
         lines = lines[:_MAX_WRAP_LINES]
         lines[-1] = lines[-1][: max(1, width - 1)].rstrip() + "…"
     return lines
+
+
+def _fmt_rank_year(value: int | None, year: int | None) -> str:
+    """Render a rank with the year it occurred, e.g. ``1 (2024)``."""
+    if value is None:
+        return "-"
+    return f"{value} ({year})" if year is not None else str(value)
+
+
+def _fmt_years(years: list[int], reach: bool = False) -> str:
+    """Render a band of years: a bare year, or comma-separated in parentheses if several.
+
+    ``reach=True`` prefixes a ``~`` to flag near-window years the rank did not clear (the
+    Open/Close shown explain a low chance rather than an assured seat).
+    """
+    if not years:
+        return "-"
+    body = str(years[0]) if len(years) == 1 else "(" + ", ".join(str(y) for y in years) + ")"
+    return f"~{body}" if reach else body
 
 
 class RecoApp(App):
@@ -82,7 +100,16 @@ class RecoApp(App):
 
     def __init__(self) -> None:
         super().__init__()
-        self.engine: RecoEngine = load_data()
+        # Load data defensively: a corrupt/unreadable store must not crash the app before
+        # the UI even mounts. On failure we start with an empty engine and surface the
+        # error via notify() once mounted (see on_mount). storage.load_* already degrade
+        # to empty on most corruption, so this guards the unexpected cases.
+        self._load_error: str | None = None
+        try:
+            self.engine: RecoEngine = load_data()
+        except Exception as exc:  # noqa: BLE001 - never let a load failure abort startup
+            self.engine = RecoEngine(cutoffs=empty_cutoffs(), nirf=[], meta={})
+            self._load_error = str(exc)
         self._recs: list = []  # last results, kept so we can re-render on resize
 
     def compose(self) -> ComposeResult:
@@ -111,13 +138,6 @@ class RecoApp(App):
                     id="types",
                     allow_blank=False,
                 )
-                yield Label("α  feasibility ↔ NIRF")
-                yield Select(
-                    [(f"{a:.1f}", a) for a in [0.0, 0.25, 0.5, 0.75, 1.0]],
-                    value=DEFAULT_ALPHA,
-                    id="alpha",
-                    allow_blank=False,
-                )
                 yield Button("Recommend (r)", id="go", variant="primary")
                 yield Button("Update DB (u)", id="upd", variant="warning")
             with Vertical(id="results"):
@@ -126,7 +146,15 @@ class RecoApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
-        if self.engine.is_empty:
+        if self._load_error is not None:
+            self._render([])  # set up columns even with no data
+            self.notify(
+                f"Could not load the local data store: {self._load_error}. "
+                "Starting empty — press 'u' to update, or run `jars-lib seed-demo`.",
+                severity="error",
+                timeout=10,
+            )
+        elif self.engine.is_empty:
             self._render([])  # set up columns even with no data
             self.notify(
                 "No data loaded. Press 'u' to update, or run `jars-lib seed-demo`.",
@@ -191,7 +219,6 @@ class RecoApp(App):
         female = self.query_one("#female", Switch).value
         home_state = self.query_one("#home_state", Input).value.strip() or None
         types_val = self.query_one("#types", Select).value
-        alpha = float(self.query_one("#alpha", Select).value)
 
         institute_types = None if types_val == "ALL" else {types_val}
         gender = GENDER_FEMALE if female else GENDER_NEUTRAL
@@ -204,7 +231,6 @@ class RecoApp(App):
             gender=gender,
             home_state=home_state,
             institute_types=institute_types,
-            alpha=alpha,
             limit=200,
         )
         self._render(recs)
@@ -215,7 +241,8 @@ class RecoApp(App):
             ] if p
         )
         self.query_one("#status", Static).update(
-            f"{len(recs)} matches · {rank_info} ±{rng} · {category} · α={alpha}"
+            f"{len(recs)} matches · {rank_info} ±{rng} · {category} · "
+            "ranked by score (NIRF » closing » opening)"
         )
 
     def _column_widths(self) -> tuple[int, int]:
@@ -247,22 +274,19 @@ class RecoApp(App):
 
         for r in recs:
             c = r.cutoff
-            rank_type = "Adv" if c.institute_type == "IIT" else "Mains"
             inst_lines = _wrap_cell(c.institute_name, inst_w)
             prog_lines = _wrap_cell(c.program_name, prog_w)
             row_height = max(len(inst_lines), len(prog_lines))
             table.add_row(
                 "\n".join(inst_lines),
                 "\n".join(prog_lines),
-                rank_type,
-                c.institute_type,
                 c.seat_type,
                 c.quota,
-                str(c.opening_rank or "-"),
-                str(c.closing_rank or "-"),
+                _fmt_rank_year(r.opening_rank_min, r.opening_rank_min_year),
+                _fmt_rank_year(r.closing_rank_max, r.closing_rank_max_year),
+                _fmt_years(r.band_years, reach=not r.band_in_range),
                 str(r.nirf_rank or "-"),
-                f"{r.feasibility:.2f}",
-                f"{r.score:.3f}",
+                f"{r.feasibility * 100:.0f}%",
                 height=row_height,
             )
 

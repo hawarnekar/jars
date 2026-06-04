@@ -23,6 +23,7 @@ from bs4 import BeautifulSoup
 from ..constants import CUTOFF_COLUMNS
 from .aspform import AspForm, parse_form
 from .errors import ScrapeError
+from .retry import with_retry
 
 log = logging.getLogger("jars_lib.scrape.josaa")
 
@@ -129,6 +130,9 @@ class JosaaClient:
 
     def __init__(self, *, delay: float = 0.6, timeout: float = 60.0) -> None:
         self.delay = delay
+        # Count of (year, round, type) leaves skipped because no submit button could be
+        # identified — surfaced to the caller at the end of a crawl.
+        self.skipped_leaves = 0
         self.client = httpx.Client(
             timeout=timeout,
             headers={"User-Agent": "jars-lib/0.1 (+offline cutoff archive)"},
@@ -147,15 +151,24 @@ class JosaaClient:
     # -- low-level postback helpers ----------------------------------------
 
     def _get_form(self) -> AspForm:
-        resp = self.client.get(ARCHIVE_URL)
-        resp.raise_for_status()
+        def do() -> httpx.Response:
+            resp = self.client.get(ARCHIVE_URL)
+            resp.raise_for_status()
+            return resp
+
+        resp = with_retry(do, description="loading the archive page")
         self._check_error(resp, context="loading the archive page")
         return self._parse(resp)
 
     def _post(self, form: AspForm, payload: dict[str, str]) -> tuple[AspForm, str]:
         time.sleep(self.delay)
-        resp = self.client.post(ARCHIVE_URL, data=payload)
-        resp.raise_for_status()
+
+        def do() -> httpx.Response:
+            resp = self.client.post(ARCHIVE_URL, data=payload)
+            resp.raise_for_status()
+            return resp
+
+        resp = with_retry(do, description="submitting a form postback")
         self._check_error(resp, context="submitting a form postback")
         return self._parse(resp), resp.text
 
@@ -266,10 +279,16 @@ class JosaaClient:
                 name, value = picked
                 form, _ = self._post(form, form.postback(name, value))
 
-        # Find and click the submit/search button.
+        # Find and click the submit/search button. If none can be identified we skip the
+        # leaf rather than guess: clicking an unrelated control would parse as zero rows
+        # (or worse, the wrong table) and silently corrupt the result.
         button_name = self._find_button(form)
         if not button_name:
-            log.warning("no submit button found for %s/%s/%s", year, round, inst_type)
+            self.skipped_leaves += 1
+            log.warning(
+                "no submit button identified for %s/%s/%s — skipping this leaf",
+                year, round, inst_type,
+            )
             return
         _, html = self._post(form, form.submit(button_name))
 
@@ -283,13 +302,18 @@ class JosaaClient:
 
     @staticmethod
     def _find_button(form: AspForm) -> str | None:
+        """Return the submit button's control name, or None if no keyword matches.
+
+        We deliberately do *not* fall back to "the first button": on a WebForms page that
+        could be an unrelated control, yielding an empty/wrong table parsed as zero rows.
+        Returning None makes the caller skip the leaf instead.
+        """
         names = list(form.buttons) or list(form.base_payload())
         for name in names:
             low = name.lower()
             if any(k in low for k in ("btnsubmit", "btnsearch", "submit", "search", "show")):
                 return name
-        # Fall back to the first button if naming is unexpected.
-        return next(iter(form.buttons), None)
+        return None
 
 
 def _canonical_type(text: str) -> str:
@@ -321,5 +345,11 @@ def scrape_cutoffs(
             rows.append(row)
             if progress and len(rows) % 200 == 0:
                 progress(len(rows))
+        if client.skipped_leaves:
+            log.warning(
+                "%d (year, round, type) leaf/leaves were skipped (no submit button "
+                "identified); their rows are absent from this scrape.",
+                client.skipped_leaves,
+            )
     df = pd.DataFrame(rows, columns=list(CUTOFF_COLUMNS))
     return df

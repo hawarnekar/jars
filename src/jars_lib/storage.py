@@ -8,6 +8,7 @@ so an interrupted update never leaves a half-written store.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import tempfile
 from datetime import datetime, timezone
@@ -17,8 +18,12 @@ from typing import Any, Iterable
 import pandas as pd
 
 from .config import Paths
-from .constants import CUTOFF_COLUMNS
+from .constants import CUTOFF_COLUMNS, shorten_institute_name, shorten_program_name
 from .models import NirfScore
+
+log = logging.getLogger(__name__)
+
+_NIRF_FIELDS = ("year", "institute_name", "nirf_rank", "nirf_score")
 
 
 # --------------------------------------------------------------------------- helpers
@@ -77,6 +82,14 @@ def save_cutoffs(df: pd.DataFrame, paths: Paths | None = None) -> None:
     paths = paths or Paths.resolve()
     paths.ensure()
     coerced = _coerce_cutoffs(df)
+    # Abbreviate names as they enter the store: IIT/NIT/IIIT prefixes in institute names
+    # and long degree descriptors (B.Tech./B.S./Dual Degree) in program names.
+    coerced["institute_name"] = coerced["institute_name"].map(
+        lambda n: shorten_institute_name(n) if isinstance(n, str) else n
+    ).astype("string")
+    coerced["program_name"] = coerced["program_name"].map(
+        lambda n: shorten_program_name(n) if isinstance(n, str) else n
+    ).astype("string")
     _atomic_write_bytes(paths.cutoffs, lambda p: coerced.to_parquet(p, index=False))
 
 
@@ -84,7 +97,11 @@ def load_cutoffs(paths: Paths | None = None) -> pd.DataFrame:
     paths = paths or Paths.resolve()
     if not paths.cutoffs.exists():
         return empty_cutoffs()
-    return _coerce_cutoffs(pd.read_parquet(paths.cutoffs))
+    try:
+        return _coerce_cutoffs(pd.read_parquet(paths.cutoffs))
+    except Exception as exc:
+        log.error("cutoffs.parquet is unreadable (%s); treating store as empty.", exc)
+        return empty_cutoffs()
 
 
 # ---------------------------------------------------------------------------- nirf
@@ -93,7 +110,13 @@ def load_cutoffs(paths: Paths | None = None) -> pd.DataFrame:
 def save_nirf(scores: Iterable[NirfScore], paths: Paths | None = None) -> None:
     paths = paths or Paths.resolve()
     paths.ensure()
-    payload = [s.to_dict() for s in scores]
+    payload = []
+    for s in scores:
+        row = s.to_dict()
+        # Keep NIRF names consistent with the shortened cutoff names so the fuzzy
+        # institute matcher lines them up cleanly.
+        row["institute_name"] = shorten_institute_name(s.institute_name)
+        payload.append(row)
     _atomic_write_json(paths.nirf, payload)
 
 
@@ -101,8 +124,18 @@ def load_nirf(paths: Paths | None = None) -> list[NirfScore]:
     paths = paths or Paths.resolve()
     if not paths.nirf.exists():
         return []
-    raw = json.loads(paths.nirf.read_text())
-    return [NirfScore(**row) for row in raw]
+    try:
+        raw = json.loads(paths.nirf.read_text())
+    except Exception as exc:
+        log.error("nirf_engineering.json is unreadable (%s); using empty NIRF data.", exc)
+        return []
+    out: list[NirfScore] = []
+    for i, row in enumerate(raw):
+        try:
+            out.append(NirfScore(**{k: row[k] for k in _NIRF_FIELDS}))
+        except Exception as exc:
+            log.warning("skipping malformed NIRF record %d (%s).", i, exc)
+    return out
 
 
 # ---------------------------------------------------------------------------- meta
@@ -118,7 +151,11 @@ def read_meta(paths: Paths | None = None) -> dict[str, Any]:
     paths = paths or Paths.resolve()
     if not paths.meta.exists():
         return {}
-    return json.loads(paths.meta.read_text())
+    try:
+        return json.loads(paths.meta.read_text())
+    except Exception as exc:
+        log.warning("meta.json is unreadable (%s); using empty metadata.", exc)
+        return {}
 
 
 def update_meta(paths: Paths | None = None, **fields: Any) -> dict[str, Any]:

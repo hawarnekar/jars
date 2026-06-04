@@ -9,7 +9,7 @@ The engine and models carry no UI dependencies.
 
 from __future__ import annotations
 
-from .config import DEFAULT_ALPHA, Paths
+from .config import Paths
 from .constants import (
     GENDERS,
     GENDER_FEMALE,
@@ -32,7 +32,6 @@ __all__ = [
     "NirfScore",
     "Recommendation",
     "Paths",
-    "DEFAULT_ALPHA",
     "INSTITUTE_TYPES",
     "IIT_TYPES",
     "NON_IIT_TYPES",

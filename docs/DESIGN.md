@@ -21,7 +21,7 @@ it without importing UI libraries.
 src/jars_lib/
   __init__.py          public API surface
   models.py            data structures (Cutoff, NirfScore, Recommendation)
-  constants.py         canonical vocabularies (seat types, quotas, institute families)
+  constants.py         canonical vocabularies, institute-name and program-name shortening functions
   config.py            data directory resolution, file paths, tuning constants
   storage.py           parquet/JSON persistence with atomic writes
   match.py             fuzzy name matching between JoSAA and NIRF institute names
@@ -55,8 +55,8 @@ One row from the JoSAA opening/closing-rank archive:
 | `year` | `int` | Counselling year |
 | `round` | `int` | Counselling round (1–6) |
 | `institute_type` | `str` | `IIT`, `NIT`, `IIIT`, or `GFTI` |
-| `institute_name` | `str` | Full institute name (JoSAA's label) |
-| `program_name` | `str` | Academic program / branch |
+| `institute_name` | `str` | Institute name, abbreviated on save (e.g. `IIT Bombay`, `NIT Trichy`) |
+| `program_name` | `str` | Program name, abbreviated on save (e.g. `CSE (4 Years, B.Tech.)`) |
 | `quota` | `str` | `AI` (All India), `HS` (Home State), `OS` (Other State) |
 | `seat_type` | `str` | Category: `OPEN`, `OBC-NCL`, `SC`, `ST`, `EWS` (with optional `(PwD)`) |
 | `gender` | `str` | `Gender-Neutral` or `Female-only (including Supernumerary)` |
@@ -74,29 +74,45 @@ One NIRF Engineering ranking entry:
 | `nirf_score` | `float` | Score on NIRF's 0–100 scale |
 
 ### `Recommendation`
-A scored suggestion returned by the engine, wrapping a `Cutoff` with scoring signals:
+A ranked suggestion returned by the engine, summarising one program across **all available
+years** (not a single year):
 
 | Field | Type | Description |
 |---|---|---|
-| `cutoff` | `Cutoff` | The underlying program row |
-| `nirf_rank` | `int \| None` | Matched NIRF rank, if any |
+| `cutoff` | `Cutoff` | Most-recent year's row — used for identity/back-reference |
+| `nirf_rank` | `int \| None` | Matched NIRF rank (latest dataset), if any |
 | `nirf_score` | `float \| None` | Matched NIRF score, if any |
-| `feasibility` | `float` | Admit likelihood in [0, 1] |
-| `nirf_norm` | `float` | Normalised NIRF score in [0, 1] |
-| `score` | `float` | Final blended score in [0, 1] |
+| `feasibility` | `float` | Recency-weighted admit likelihood in [0, 1] (shown as **Chance** in the UI; informational only — does not affect ordering) |
+| `score` | `float` | Ranking key in [0, 1] — weighted blend of NIRF, closing, and opening goodness (see Scoring Algorithm) |
+| `rank_closing` | `float \| None` | Recency-weighted closing rank across all data years (the raw value used in scoring) |
+| `rank_opening` | `float \| None` | Recency-weighted opening rank across all data years with opening data |
+| `in_range_years` | `list[int]` | Years the candidate's rank fell within the program's open..close band, recent→old. Empty for a "reach" |
+| `window_years` | `list[int]` | Years whose closing rank fell within the candidate's ±range window. Always non-empty |
+| `opening_rank_min` | `int \| None` | Smallest opening rank across the display band (in-range years if any, else window years) |
+| `opening_rank_min_year` | `int \| None` | Year that opening rank occurred |
+| `closing_rank_max` | `int \| None` | Largest closing rank across the display band |
+| `closing_rank_max_year` | `int \| None` | Year that closing rank occurred |
+
+Two derived properties assist display code:
+
+| Property | Returns |
+|---|---|
+| `band_in_range` | `True` when Open/Close/Years reflect in-range years; `False` for a reach (window-year fallback) |
+| `band_years` | The list of years Open/Close summarise: `in_range_years` if any, else `window_years` |
 
 ---
 
 ## Scoring Algorithm
 
-### Feasibility signal
+### Per-year feasibility
 
-`feasibility(rank, closing_rank)` uses a logistic function on the *relative margin*
-between the candidate's rank and the program's historical closing rank:
+`feasibility(rank, closing_rank)` computes the admit-likelihood from a single year's
+closing rank using a logistic function on the *relative margin*:
 
 ```
 relative_margin = (closing_rank - rank) / closing_rank
-feasibility     = 1 / (1 + exp(-k * relative_margin))
+x               = clamp(k * relative_margin, -60, 60)
+feasibility     = 1 / (1 + exp(-x))
 ```
 
 `k = 6.0` is the steepness constant. With this value:
@@ -105,30 +121,65 @@ feasibility     = 1 / (1 + exp(-k * relative_margin))
 - An exact match (closing rank = your rank) scores ≈ 0.50.
 - A program whose closing rank is 20% below your rank scores ≈ 0.23 (a reach).
 
-A missing or zero closing rank returns 0.0.
+A missing or zero closing rank returns 0.0. The exponent is clamped to `[-60, 60]` to
+prevent `math.exp` overflow on extreme inputs.
 
-### NIRF signal
+### Recency-weighted chance
 
-The NIRF score (0–100) is divided by 100 to normalise it to [0, 1]:
-
-```
-nirf_norm = nirf_score / 100
-```
-
-Institutes absent from NIRF receive `nirf_norm = 0.0` and are still ranked, using
-feasibility alone.
-
-### Blended score
+Rather than using only the latest year's closing rank, the engine blends per-year
+feasibility scores across **all years** using exponential recency weights:
 
 ```
-score = alpha * feasibility + (1 - alpha) * nirf_norm
+weight(y) = RECENCY_DECAY ^ (ref_year - y)        # RECENCY_DECAY = 0.6
+chance    = Σ weight(y) * feasibility(rank, close_y) / Σ weight(y)
 ```
 
-`alpha` is user-controlled in [0, 1]:
+A year that is `n` years older than `ref_year` (the most recent year in the data)
+contributes `0.6^n` of the weight, so the most recent year dominates while older years
+still contribute. This is what is stored in `Recommendation.feasibility` and displayed
+as **Chance** (as a percentage) in both the TUI and CLI.
 
-- `alpha = 1.0` — rank purely by safety; NIRF is ignored.
-- `alpha = 0.0` — rank purely by NIRF quality; admission likelihood is ignored.
-- `alpha = 0.5` (default) — equal weight on both signals.
+Each program is also reduced to one row per year before scoring: the highest-round row
+for that year is used (the final, settled cutoff).
+
+### Weighted ranking score
+
+Each program's ranking `score` is a weighted blend of three "lower rank = better"
+goodness components, each normalised to [0, 1]:
+
+```
+score = W_NIRF · g_nirf  +  W_CLOSING · g_closing  +  W_OPENING · g_opening
+      =  0.6  · g_nirf   +    0.3     · g_closing   +    0.1     · g_opening
+```
+
+Because it is a *weighted sum* (not a strict priority), a large advantage on a lower-weighted
+term can outweigh a small disadvantage on a higher-weighted one.
+
+**`g_nirf` — NIRF goodness (fixed scale)**
+
+```
+g_nirf = max(0, min(1, 1 - (nirf_rank - 1) / 200))
+```
+
+Rank 1 → 1.0; rank 200+ → 0.0; institutes absent from NIRF → 0.0. The scale of 200
+spans the full NIRF Engineering list, so the curve is independent of which institutes
+happen to appear in a given result set. Only the **latest NIRF dataset** is used.
+
+**`g_closing` / `g_opening` — rank goodness (min-max, per exam family)**
+
+The recency-weighted closing and opening ranks are min-max normalised *within each exam
+family* (IIT vs NIT/IIIT/GFTI), so the best-in-family program scores 1.0:
+
+```
+g_closing = (max_closing - rank_closing) / (max_closing - min_closing)
+```
+
+Normalising per-family keeps IIT and non-IIT programs comparable through the NIRF term
+(which uses a global scale) while avoiding artefacts from the two exam scales having
+different numerical ranges.
+
+A missing opening rank falls back to the program's closing goodness so the tertiary term
+never penalises programs with incomplete data.
 
 Results are sorted by `score` descending.
 
@@ -145,7 +196,9 @@ JoSAA runs two parallel rank scales:
 
 - Only `jee_adv_rank` → query `IIT_TYPES` only.
 - Only `jee_mains_rank` → query `NON_IIT_TYPES` only.
-- Both → query each family with its own rank scale, then merge and re-sort by score.
+- Both → query each family with its own rank scale, then merge and re-sort by `score`.
+  The merge is safe because `g_closing`/`g_opening` are normalised within each family, so
+  only the globally-comparable `g_nirf` term influences cross-family ordering.
 
 The split is defined in `constants.py`:
 
@@ -161,11 +214,13 @@ NON_IIT_TYPES = frozenset({"NIT", "IIIT", "GFTI"})
 JoSAA and NIRF use slightly different institute name spellings. `match.py` resolves them
 with fuzzy matching:
 
-1. Normalise both name sets: lowercase, collapse whitespace, strip hyphens/commas.
-2. For each JoSAA name, call `rapidfuzz.process.extractOne` with `fuzz.token_sort_ratio`
+1. Abbreviate both name sets via `shorten_institute_name()` (e.g. `Indian Institute of
+   Technology Bombay → IIT Bombay`) so long and short forms compare equal.
+2. Normalise: lowercase, collapse whitespace, strip hyphens/commas.
+3. For each JoSAA name, call `rapidfuzz.process.extractOne` with `fuzz.token_sort_ratio`
    against the normalised NIRF names.
-3. Accept matches scoring ≥ 88 (default threshold in `config.DEFAULT_NAME_MATCH_THRESHOLD`).
-4. Build a lookup `josaa_name → (nirf_rank, nirf_score)` used at scoring time.
+4. Accept matches scoring ≥ 88 (default threshold in `config.DEFAULT_NAME_MATCH_THRESHOLD`).
+5. Build a lookup `josaa_name → (nirf_rank, nirf_score)` used at scoring time.
 
 The lookup is built once in `RecoEngine.__post_init__` and reused for all queries.
 
@@ -186,13 +241,24 @@ load and save: `year`, `round`, `opening_rank`, `closing_rank` are nullable `Int
 string columns use pandas `StringDtype`. This prevents silent type drift between scrape
 runs.
 
+**Name normalisation** — `save_cutoffs` abbreviates institute names (`Indian Institute of
+Technology → IIT`, `National Institute of Technology → NIT`, `Indian Institute of
+Information Technology → IIIT`) and program names (`Bachelor of Technology → B.Tech.`,
+`Bachelor of Science → B.S.`, dual-degree/integrated phrases → `B.Tech. + M.Tech.` or
+`B.S. + M.S.`, etc.) as data enters the store. Both `save_nirf` and `match._normalise`
+apply the same institute abbreviation so names stay consistent across all three files.
+The shortening functions (`shorten_institute_name`, `shorten_program_name`) live in
+`constants.py` and are idempotent.
+
 **Atomic writes** — every save writes to a temp file in the same directory, then calls
 `os.replace()` to atomically rename it over the target. An interrupted update never
 leaves a partially-written file.
 
-**Data directory resolution** — `config.data_dir()` returns `JARS_DATA_DIR` from the
-environment if set, otherwise the `data/` directory adjacent to the repository root.
-This lets embedding apps redirect to their own data location without code changes.
+**Data directory resolution** — `config.data_dir()` resolves with a three-level
+precedence: `$JARS_DATA_DIR` (explicit override) → the source-tree `data/` directory (only
+when it exists, i.e. an editable checkout) → `platformdirs.user_data_dir("jars")` (a
+writable per-user directory for installed wheels). This lets embedding apps and installed
+packages find a sensible writable location without any code changes.
 
 ---
 
@@ -252,10 +318,16 @@ data row is identified by its first cell matching the NIRF institute-ID pattern
 `update.py` — `update_database()`:
 
 1. Dispatches to the chosen scrape backend and accumulates cutoff rows.
+   - **`--resume`** mode loads the existing store first and skips `(year, round, type)`
+     combinations already present. The scraper checkpoints after each `(year, round)` pair
+     so partial progress survives a crash.
+   - **`--force`** bypasses the empty-overwrite guard that otherwise refuses to clobber a
+     non-empty store with zero scraped rows (safety against a silent scrape failure).
 2. Saves the cutoff DataFrame atomically.
 3. Derives the NIRF year from the scraped cutoff years (or the `--nirf-year` flag) and
    scrapes NIRF. NIRF failure is non-fatal — existing NIRF data is kept.
-4. Writes `meta.json` with updated stats and a UTC timestamp.
+4. Writes `meta.json` with updated stats, a UTC timestamp, and per-`(year, round)` row
+   counts (`round_counts`) so a thin partial slice is visible via `jars-lib info`.
 
 Both the CLI and the TUI call this function, passing an optional `progress` callback for
 status updates.
@@ -267,9 +339,19 @@ status updates.
 `tui/jars_tui/app.py` — `RecoApp(App)`:
 
 - **Left panel** (`#form`): a `VerticalScroll` containing labelled `Input` and `Select`
-  widgets for all filter parameters.
-- **Right panel** (`#results`): a `DataTable` with fixed-width narrow columns and two
-  flexible-width columns (Institute, Program) that reflow on terminal resize.
+  widgets for rank, range, category, gender, home state, and institute types.
+- **Right panel** (`#results`): a `DataTable` with two flexible-width columns (Institute,
+  Program) that reflow on terminal resize, plus fixed-width columns: `Category`, `Quota`,
+  `Open` (smallest opening rank across the display band, with its year), `Close` (largest
+  closing rank across the display band, with its year), `Years` (band years recent→old;
+  prefixed `~` when the band comes from the window-year reach fallback rather than in-range
+  years), `NIRF` (rank), `Chance` (recency-weighted admit likelihood as %). The CLI renders
+  the same columns in a plain-text auto-sized table.
+
+  The **display band** is the in-range years if the candidate's rank fell inside the
+  opening..closing band in any year; otherwise the window years (years whose closing rank
+  landed within the ±range). This ensures reaches show the relevant ranks rather than
+  blank fields, helping users understand why the chance is low.
 
 Text wrapping in cells uses `textwrap.wrap()` capped at 6 lines; the `DataTable` row
 height is set to the maximum wrapped line count of the two flexible columns.

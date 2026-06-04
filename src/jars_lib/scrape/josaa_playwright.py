@@ -15,7 +15,7 @@ discovered by keyword (id/name substring), mirroring the httpx backend.
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 
 import pandas as pd
 
@@ -28,6 +28,7 @@ from .josaa import (
     _rank_to_int,
     parse_result_table,
 )
+from .retry import with_retry
 
 log = logging.getLogger("jars_lib.scrape.josaa_playwright")
 
@@ -59,6 +60,8 @@ class PlaywrightJosaaScraper:
     def __init__(self, *, headless: bool = True, nav_timeout_ms: int = 45_000) -> None:
         self.headless = headless
         self.nav_timeout_ms = nav_timeout_ms
+        # Count of leaves skipped because no submit button could be identified.
+        self.skipped_leaves = 0
         self._sync_playwright, self._PWTimeout = _import_playwright()
 
     # -- in-page helpers ----------------------------------------------------
@@ -106,7 +109,12 @@ class PlaywrightJosaaScraper:
         return out
 
     def _find_button(self, page) -> str | None:
-        """Return a CSS selector for the submit button (prefer its stable id)."""
+        """Return a CSS selector for the submit button, or None if no keyword matches.
+
+        Like the httpx backend, we do *not* fall back to "the first button on the page":
+        clicking a guessed control would render an empty or wrong table that then parses
+        as zero rows. None makes the caller skip the leaf instead.
+        """
         buttons = page.eval_on_selector_all(
             "input[type=submit], input[type=button], button",
             "els => els.map(e => ({id: e.id, name: e.name || '', value: e.value || ''}))",
@@ -124,9 +132,6 @@ class PlaywrightJosaaScraper:
             if any(k in hay for k in ("btnsubmit", "btnsearch", "submit", "search", "show")):
                 if sel := selector(b):
                     return sel
-        for b in buttons:
-            if sel := selector(b):
-                return sel
         return None
 
     def _select(self, page, select_id: str, value: str, *, autopostback: bool) -> None:
@@ -161,14 +166,29 @@ class PlaywrightJosaaScraper:
         institute_types: list[str] | None = None,
         *,
         progress=None,
+        skip_done: set[tuple[int, int, str]] | None = None,
+        on_round_complete: Callable[[list[dict]], None] | None = None,
     ) -> Iterator[dict]:
+        """Yield cutoff row dicts across the requested cross-product.
+
+        ``skip_done`` is a set of ``(year, round, institute_type)`` integer/string tuples
+        already present in the store; matching leaves are silently skipped (resume mode).
+        ``on_round_complete`` is called with all rows from a completed (year, round) pair
+        so the caller can checkpoint incrementally.
+        """
         sync_playwright = self._sync_playwright
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=self.headless)
             try:
                 page = browser.new_page()
                 page.set_default_timeout(self.nav_timeout_ms)
-                page.goto(ARCHIVE_URL, wait_until="load")
+                # The initial navigation is the most failure-prone step (cold DNS, a slow
+                # first byte); retry it on a Playwright timeout before giving up.
+                with_retry(
+                    lambda: page.goto(ARCHIVE_URL, wait_until="load"),
+                    is_transient=lambda exc: isinstance(exc, self._PWTimeout),
+                    description=f"loading {ARCHIVE_URL}",
+                )
 
                 selects = self._discover_selects(page)
                 year_sel = self._find(selects, "year")
@@ -181,11 +201,16 @@ class PlaywrightJosaaScraper:
 
                 for yv, yt in year_opts:
                     self._select(page, year_sel["id"], yv, autopostback=year_sel["autopostback"])
-                    yield from self._crawl_year(page, yv, yt, rounds, institute_types, progress)
+                    yield from self._crawl_year(
+                        page, yv, yt, rounds, institute_types, progress,
+                        skip_done=skip_done,
+                        on_round_complete=on_round_complete,
+                    )
             finally:
                 browser.close()
 
-    def _crawl_year(self, page, yv, yt, rounds, institute_types, progress):
+    def _crawl_year(self, page, yv, yt, rounds, institute_types, progress, *,
+                    skip_done=None, on_round_complete=None):
         round_sel = self._find(self._discover_selects(page), "round")
         if not round_sel:
             log.warning("no round dropdown for year %s", yt)
@@ -210,9 +235,24 @@ class PlaywrightJosaaScraper:
                     for v, t in type_opts
                     if _canonical_type(t).upper() in wanted or v.upper() in wanted
                 ]
+
+            # Buffer all rows for this (year, round) so we can checkpoint after the full
+            # round completes and skip already-fetched leaves in resume mode.
+            round_rows: list[dict] = []
+            yr_int = _rank_to_int(yt) or 0
+            rd_int = _rank_to_int(rv) or 0
+
             for tv, tt in type_opts:
+                canonical_tt = _canonical_type(tt)
+                if skip_done and (yr_int, rd_int, canonical_tt) in skip_done:
+                    log.info("resume: skipping %s/%s/%s (already in store)", yt, rv, tt)
+                    continue
                 self._select(page, type_sel["id"], tv, autopostback=type_sel["autopostback"])
-                yield from self._crawl_leaf(page, yt, rt, tt, progress)
+                round_rows.extend(self._crawl_leaf(page, yt, rt, tt, progress))
+
+            yield from round_rows
+            if on_round_complete and round_rows:
+                on_round_complete(round_rows)
 
     def _crawl_leaf(self, page, year, round, inst_type, progress):
         # Choose "All" on the remaining dropdowns where available.
@@ -221,7 +261,11 @@ class PlaywrightJosaaScraper:
 
         button_selector = self._find_button(page)
         if not button_selector:
-            log.warning("no submit button for %s/%s/%s", year, round, inst_type)
+            self.skipped_leaves += 1
+            log.warning(
+                "no submit button identified for %s/%s/%s — skipping this leaf",
+                year, round, inst_type,
+            )
             return
         try:
             with page.expect_navigation(wait_until="load", timeout=self.nav_timeout_ms):
@@ -247,8 +291,15 @@ def scrape_cutoffs_playwright(
     *,
     headless: bool = True,
     progress=None,
+    checkpoint_fn: Callable[[list[dict]], None] | None = None,
+    skip_done: set[tuple[int, int, str]] | None = None,
 ) -> pd.DataFrame:
-    """Crawl the archive with a headless browser and return a cutoffs DataFrame."""
+    """Crawl the archive with a headless browser and return a cutoffs DataFrame.
+
+    ``checkpoint_fn`` is called with the list of new rows after each (year, round)
+    completes, so the caller can persist incrementally.
+    ``skip_done`` is a set of ``(year, round, institute_type)`` tuples to skip (resume).
+    """
     scraper = PlaywrightJosaaScraper(headless=headless)
     rows: list[dict] = []
 
@@ -256,6 +307,17 @@ def scrape_cutoffs_playwright(
         if progress:
             progress(len(rows))
 
-    for row in scraper.crawl(years, rounds, institute_types, progress=leaf_progress):
+    for row in scraper.crawl(
+        years, rounds, institute_types,
+        progress=leaf_progress,
+        skip_done=skip_done,
+        on_round_complete=checkpoint_fn,
+    ):
         rows.append(row)
+    if scraper.skipped_leaves:
+        log.warning(
+            "%d (year, round, type) leaf/leaves were skipped (no submit button "
+            "identified); their rows are absent from this scrape.",
+            scraper.skipped_leaves,
+        )
     return pd.DataFrame(rows, columns=list(CUTOFF_COLUMNS))

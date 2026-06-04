@@ -27,11 +27,12 @@ from typing import Any
 
 import pandas as pd
 
-from .config import DEFAULT_ALPHA, Paths
+from .config import Paths
 from .constants import GENDER_NEUTRAL, IIT_TYPES, NON_IIT_TYPES
 from .match import nirf_lookup
 from .models import NirfScore, Recommendation
 from .recommend import recommend as _recommend
+from .recommend import _order_key
 from . import storage
 
 
@@ -72,16 +73,21 @@ class RecoEngine:
         institute_types: set[str] | None = None,
         year: int | None = None,
         round: int | None = None,
-        alpha: float = DEFAULT_ALPHA,
         limit: int | None = None,
     ) -> list[Recommendation]:
-        """Return scored recommendations, best first.
+        """Return ranked recommendations, best first.
 
         At least one of ``jee_adv_rank`` or ``jee_mains_rank`` must be supplied.
 
         * Only ``jee_adv_rank`` → IIT results only (Advanced rank scale).
         * Only ``jee_mains_rank`` → NIT / IIIT / GFTI results only (Mains CRL scale).
-        * Both → all institute types, merged and re-sorted by score.
+        * Both → all institute types, merged and re-sorted by the ranking key.
+
+        Results are ordered by the weighted ranking ``score`` (see
+        :func:`jars_lib.recommend.recommend`). Each family is scored against its own
+        rank scale (closing/opening goodness is normalised within the family), and the two
+        scored lists are merged and re-sorted by score — NIRF, on a fixed global scale,
+        keeps the families comparable.
 
         The optional ``institute_types`` filter is intersected with the rank-implied
         set so you can still restrict to e.g. just NITs when providing Mains rank.
@@ -95,7 +101,6 @@ class RecoEngine:
             home_state=home_state,
             year=year,
             round=round,
-            alpha=alpha,
             data=self.cutoffs,
             nirf_by_institute=self._nirf_lookup,
         )
@@ -124,7 +129,7 @@ class RecoEngine:
                     **common,
                 )
 
-        recs.sort(key=lambda r: r.score, reverse=True)
+        recs.sort(key=_order_key)
         if limit is not None:
             recs = recs[:limit]
         return recs

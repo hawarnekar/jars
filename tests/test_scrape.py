@@ -5,10 +5,85 @@ from __future__ import annotations
 import httpx
 import pytest
 
+from jars_lib.constants import shorten_institute_name, shorten_program_name
 from jars_lib.scrape.aspform import parse_form
 from jars_lib.scrape.errors import ScrapeError
 from jars_lib.scrape.josaa import JosaaClient, parse_result_table
 from jars_lib.scrape.nirf import parse_nirf_table
+
+
+def test_shorten_institute_name():
+    assert shorten_institute_name("Indian Institute of Technology Bombay") == "IIT Bombay"
+    assert (
+        shorten_institute_name("National Institute of Technology Tiruchirappalli")
+        == "NIT Tiruchirappalli"
+    )
+    assert (
+        shorten_institute_name("Indian Institute of Information Technology, Allahabad")
+        == "IIIT, Allahabad"
+    )
+    assert (
+        shorten_institute_name("Malaviya National Institute of Technology Jaipur")
+        == "Malaviya NIT Jaipur"
+    )
+    # IIIT must not be mangled by the IIT rule, and already-short names are unchanged.
+    assert shorten_institute_name("IIT Madras") == "IIT Madras"
+    # Unrelated institutes are left alone.
+    assert shorten_institute_name("Anna University") == "Anna University"
+
+
+def test_shorten_program_name():
+    assert (
+        shorten_program_name("Computer Science and Engineering (4 Years, Bachelor of Technology)")
+        == "Computer Science and Engineering (4 Years, B.Tech.)"
+    )
+    assert (
+        shorten_program_name("Physics (4 Years, Bachelor of Science)")
+        == "Physics (4 Years, B.S.)"
+    )
+    # Tech dual-degree / integrated phrasings -> "B.Tech. + M.Tech." (note nested parens).
+    assert (
+        shorten_program_name("Civil Engineering (5 Years, Bachelor and Master of Technology (Dual Degree))")
+        == "Civil Engineering (5 Years, B.Tech. + M.Tech.)"
+    )
+    assert (
+        shorten_program_name("Mechanical (5 Years, Integrated Master of Technology)")
+        == "Mechanical (5 Years, B.Tech. + M.Tech.)"
+    )
+    # Science dual-degree / integrated phrasings -> "B.S. + M.S.".
+    assert (
+        shorten_program_name("Chemistry (5 Years, Bachelor of Science and Master of Science (Dual Degree))")
+        == "Chemistry (5 Years, B.S. + M.S.)"
+    )
+    assert (
+        shorten_program_name("Chemistry (5 Years, Integrated Bachelor of Science-Master of Science)")
+        == "Chemistry (5 Years, B.S. + M.S.)"
+    )
+    # MBA dual-degree phrasings keep the MBA but drop the "(Dual Degree)" wrapper.
+    assert (
+        shorten_program_name("Chemistry (5 Years, Bachelor of Science and MBA (Dual Degree))")
+        == "Chemistry (5 Years, B.S. and MBA)"
+    )
+    assert (
+        shorten_program_name("Mechanical (5 Years, Bachelor of Technology and MBA (Dual Degree))")
+        == "Mechanical (5 Years, B.Tech. and MBA)"
+    )
+    # Pre-abbreviated B.Tech.+M.Tech./MS variant: tidy the MS and drop "(Dual Degree)".
+    assert (
+        shorten_program_name("EE (5 Years, B.Tech. + M.Tech./MS (Dual Degree))")
+        == "EE (5 Years, B.Tech. + M.Tech./M.S.)"
+    )
+    # Blanket "Master of Science" -> "M.S." also reaches standalone/integrated forms.
+    assert (
+        shorten_program_name("Maths (5 Years, Integrated Master of Science)")
+        == "Maths (5 Years, Integrated M.S.)"
+    )
+    # Already-short and unrelated descriptors are untouched.
+    assert shorten_program_name("CSE (4 Years, B.Tech.)") == "CSE (4 Years, B.Tech.)"
+    assert (
+        shorten_program_name("Architecture (5 Years, Bachelor of Architecture)")
+        == "Architecture (5 Years, Bachelor of Architecture)"
+    )
 
 ASP_HTML = """
 <html><body>

@@ -79,10 +79,14 @@ jars-lib recommend --adv-rank 3000 --mains-rank 25000 --range 2000
 
 # Restrict to NITs only, include female-only seats, apply home-state quota:
 jars-lib recommend --mains-rank 25000 --types NIT --female --home-state Rajasthan
-
-# Adjust the alpha weight (0 = favour NIRF rank, 1 = favour safest admit):
-jars-lib recommend --mains-rank 25000 --alpha 0.3
 ```
+
+Results are ranked by a **weighted score** built from three "lower is better" components —
+**NIRF rank** (highest weight), **closing rank**, then **opening rank** — with closing and
+opening ranks **weighted towards recent years**. Because it's a weighted blend (not a strict
+priority), a large advantage on a lower-weighted term can outweigh a small disadvantage on a
+higher-weighted one. The "Chance" column still shows the recency-weighted admit likelihood
+for context, but does not affect order.
 
 ### Download real JoSAA data from the web
 
@@ -118,10 +122,14 @@ jars-lib info
 | `--female` | off | Include female-only seats |
 | `--home-state STATE` | — | Enable home-state quota seats at NITs/IIITs/GFTIs |
 | `--types LIST` | all | Comma-separated filter: `IIT`, `NIT`, `IIIT`, `GFTI` |
-| `--year Y` | latest | Data year to use |
-| `--round R` | latest | Counselling round to use |
-| `--alpha A` | 0.5 | Scoring weight: 0 = NIRF quality only, 1 = safety only |
+| `--year Y` | all years | Pin results to a specific data year |
+| `--round R` | latest round for year | Pin results to a specific counselling round |
 | `--limit N` | 30 | Maximum results to print |
+
+Ordering is by a weighted score: **NIRF rank** (weight 0.6), **recency-weighted closing
+rank** (0.3), and **recency-weighted opening rank** (0.1), each normalised so lower ranks
+score higher. Institutes without a NIRF rank get no NIRF credit, so they fall below
+comparably-competitive ranked institutes.
 
 ### `jars-lib update`
 
@@ -147,16 +155,21 @@ Prints the data directory path, row counts, and last-updated timestamp.
 
 ## Data Directory
 
-Data is stored under `data/` in the repository root by default:
+The data location is resolved in this order:
+
+1. `$JARS_DATA_DIR` environment variable — always wins if set.
+2. `data/` in the repository root — used automatically when running from a source checkout.
+3. A per-user data directory (`~/.local/share/jars` on Linux, `~/Library/Application Support/jars` on macOS) — used when the package is installed as a wheel (no source tree present).
+
+Files stored:
 
 ```
-data/
-  cutoffs.parquet         JoSAA opening/closing ranks
-  nirf_engineering.json   NIRF Engineering institute scores
-  meta.json               Metadata (last updated, row counts)
+cutoffs.parquet         JoSAA opening/closing ranks
+nirf_engineering.json   NIRF Engineering institute scores
+meta.json               Metadata (last updated, row counts, per-round stats)
 ```
 
-Override the location with the `JARS_DATA_DIR` environment variable:
+Override with `JARS_DATA_DIR`:
 
 ```bash
 JARS_DATA_DIR=/path/to/my/data jars-lib recommend --mains-rank 25000
@@ -175,8 +188,8 @@ pytest
 
 ## Notes
 
-- Cutoff data reflects the previous year's results — use as a guide, not a guarantee.
+- Cutoff data covers historical JoSAA results (currently 2016–2025). Recommendations show the years your rank fell within a program's opening/closing band and weight recent years more heavily — use as a guide, not a guarantee.
 - Home-state quota seats are shown only when `--home-state` is supplied.
-- NIRF covers the Engineering list only; institutes not in NIRF are scored on feasibility alone.
+- NIRF covers the Engineering list only; since NIRF rank is the primary sort key, institutes not in NIRF are ranked after all NIRF-ranked ones.
 - A full multi-year scrape can take many minutes. Scope it with `--years`/`--rounds`/`--types`.
 - The live JoSAA scrape requires Playwright because the archive endpoint rejects plain HTTP form posts.

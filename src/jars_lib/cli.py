@@ -15,8 +15,8 @@ import sys
 
 import httpx
 
-from .config import DEFAULT_ALPHA, Paths
-from .constants import GENDER_FEMALE, GENDER_NEUTRAL
+from .config import Paths
+from .constants import GENDER_FEMALE, GENDER_NEUTRAL, INSTITUTE_TYPES, SEAT_TYPES
 from .engine import load_data
 from .scrape.errors import ScrapeError
 from .update import seed_demo, update_database
@@ -29,6 +29,23 @@ def _split(values: str | None) -> list[str] | None:
 
 
 def cmd_recommend(args: argparse.Namespace) -> int:
+    # Input validation — catch bad values before they reach the engine.
+    if args.category not in SEAT_TYPES:
+        valid = ", ".join(SEAT_TYPES)
+        print(f"Error: unknown --category {args.category!r}. Valid values: {valid}.", file=sys.stderr)
+        return 2
+
+    types_list = _split(args.types)
+    if types_list:
+        invalid = [t for t in types_list if t not in INSTITUTE_TYPES]
+        if invalid:
+            print(
+                f"Error: unknown --types value(s): {', '.join(invalid)}. "
+                f"Valid values: {', '.join(INSTITUTE_TYPES)}.",
+                file=sys.stderr,
+            )
+            return 2
+
     engine = load_data()
     if engine.is_empty:
         print(
@@ -55,10 +72,9 @@ def cmd_recommend(args: argparse.Namespace) -> int:
         seat_type=args.category,
         gender=gender,
         home_state=args.home_state,
-        institute_types=set(_split(args.types) or []) or None,
+        institute_types=set(types_list) if types_list else None,
         year=args.year,
         round=args.round,
-        alpha=args.alpha,
         limit=args.limit,
     )
     if not recs:
@@ -69,29 +85,42 @@ def cmd_recommend(args: argparse.Namespace) -> int:
     return 0
 
 
-def _rank_label(itype: str) -> str:
-    return "Adv" if itype == "IIT" else "Mains"
+def _fmt_rank_year(value: int | None, year: int | None) -> str:
+    """Render a rank with the year it occurred, e.g. ``1 (2024)``."""
+    if value is None:
+        return "-"
+    return f"{value} ({year})" if year is not None else str(value)
+
+
+def _fmt_years(years, reach: bool = False) -> str:
+    """Render a band of years: a bare year, or comma-separated in parentheses if several.
+
+    ``reach=True`` prefixes a ``~`` to flag that these are near-window years the rank did
+    not actually clear (so the Open/Close shown explain a low chance, not an assured seat).
+    """
+    if not years:
+        return "-"
+    body = str(years[0]) if len(years) == 1 else "(" + ", ".join(str(y) for y in years) + ")"
+    return f"~{body}" if reach else body
 
 
 def _print_table(recs) -> None:
-    headers = ["#", "Type", "Rank", "Institute", "Program", "Cat", "Quota", "Open", "Close", "NIRF", "Feas", "Score"]
+    headers = ["#", "Institute", "Program", "Category", "Quota", "Open", "Close", "Years", "NIRF", "Chance"]
     rows = []
     for i, r in enumerate(recs, 1):
         c = r.cutoff
         rows.append(
             [
                 str(i),
-                c.institute_type,
-                _rank_label(c.institute_type),
                 _trim(c.institute_name, 38),
                 _trim(c.program_name, 34),
                 c.seat_type,
                 c.quota,
-                str(c.opening_rank or "-"),
-                str(c.closing_rank or "-"),
+                _fmt_rank_year(r.opening_rank_min, r.opening_rank_min_year),
+                _fmt_rank_year(r.closing_rank_max, r.closing_rank_max_year),
+                _fmt_years(r.band_years, reach=not r.band_in_range),
                 str(r.nirf_rank or "-"),
-                f"{r.feasibility:.2f}",
-                f"{r.score:.3f}",
+                f"{r.feasibility * 100:.0f}%",
             ]
         )
     widths = [max(len(h), *(len(row[i]) for row in rows)) for i, h in enumerate(headers)]
@@ -107,23 +136,18 @@ def _trim(text: str, n: int) -> str:
 
 
 def cmd_update(args: argparse.Namespace) -> int:
-    try:
-        update_database(
-            years=_split(args.years),
-            rounds=_split(args.rounds),
-            institute_types=_split(args.types),
-            nirf_year=args.nirf_year,
-            delay=args.delay,
-            backend=args.backend,
-            headless=not args.show_browser,
-            progress=lambda msg: print(msg),
-        )
-    except ScrapeError as exc:
-        print(f"\nUpdate failed: {exc}", file=sys.stderr)
-        return 1
-    except httpx.HTTPError as exc:
-        print(f"\nUpdate failed: network error talking to the source: {exc}", file=sys.stderr)
-        return 1
+    update_database(
+        years=_split(args.years),
+        rounds=_split(args.rounds),
+        institute_types=_split(args.types),
+        nirf_year=args.nirf_year,
+        delay=args.delay,
+        backend=args.backend,
+        headless=not args.show_browser,
+        progress=lambda msg: print(msg),
+        force=args.force,
+        resume=args.resume,
+    )
     return 0
 
 
@@ -141,8 +165,14 @@ def cmd_info(args: argparse.Namespace) -> int:
     print(f"NIRF     : {len(engine.nirf)} institutes")
     if not engine.is_empty:
         print(f"Years    : {engine.years()}")
+    round_counts = engine.meta.get("round_counts") if engine.meta else None
+    if round_counts:
+        print("Rounds   :")
+        for key in sorted(round_counts):
+            print(f"  {key:>10}: {round_counts[key]} rows")
     if engine.meta:
-        print(f"Meta     : {engine.meta}")
+        shown = {k: v for k, v in engine.meta.items() if k != "round_counts"}
+        print(f"Meta     : {shown}")
     return 0
 
 
@@ -167,7 +197,6 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--types", default=None, help="comma list to restrict: IIT,NIT,IIIT,GFTI")
     r.add_argument("--year", type=int, default=None)
     r.add_argument("--round", type=int, default=None)
-    r.add_argument("--alpha", type=float, default=DEFAULT_ALPHA, help="feasibility vs NIRF (0..1)")
     r.add_argument("--limit", type=int, default=30)
     r.set_defaults(func=cmd_recommend)
 
@@ -188,6 +217,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="run Playwright with a visible browser window (debugging)",
     )
+    u.add_argument(
+        "--force",
+        action="store_true",
+        help="allow an empty scrape result to overwrite the existing store",
+    )
+    u.add_argument(
+        "--resume",
+        action="store_true",
+        help="skip (year, round, type) combinations already in the store and merge new rows",
+    )
     u.set_defaults(func=cmd_update)
 
     s = sub.add_parser("seed-demo", help="load the bundled demo dataset (no network)")
@@ -206,7 +245,20 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.INFO if args.verbose else logging.WARNING,
         format="%(message)s",
     )
-    return args.func(args)
+    try:
+        return args.func(args)
+    except ScrapeError as exc:
+        print(f"\nError: {exc}", file=sys.stderr)
+        return 1
+    except httpx.HTTPError as exc:
+        print(f"\nError: network error: {exc}", file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        print(f"\nError: {exc}", file=sys.stderr)
+        return 2
+    except KeyboardInterrupt:
+        print("\nInterrupted.", file=sys.stderr)
+        return 130
 
 
 if __name__ == "__main__":

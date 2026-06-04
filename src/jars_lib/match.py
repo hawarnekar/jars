@@ -14,10 +14,14 @@ from typing import Iterable
 from rapidfuzz import fuzz, process
 
 from .config import DEFAULT_NAME_MATCH_THRESHOLD
+from .constants import shorten_institute_name
 from .models import NirfScore
 
 
 def _normalise(name: str) -> str:
+    # Abbreviate first so long ("Indian Institute of Technology …") and short ("IIT …")
+    # forms compare equal even if one side wasn't shortened at store time.
+    name = shorten_institute_name(name)
     return " ".join(name.lower().replace("-", " ").replace(",", " ").split())
 
 

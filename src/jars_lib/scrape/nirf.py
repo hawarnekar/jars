@@ -14,6 +14,8 @@ import httpx
 from bs4 import BeautifulSoup
 
 from ..models import NirfScore
+from .errors import ScrapeError
+from .retry import with_retry
 
 log = logging.getLogger("jars_lib.scrape.nirf")
 
@@ -83,13 +85,35 @@ def _to_int(text: str) -> int | None:
 
 
 def scrape_nirf(year: int, *, timeout: float = 60.0) -> list[NirfScore]:
-    """Fetch and parse the NIRF Engineering ranking for ``year``."""
+    """Fetch and parse the NIRF Engineering ranking for ``year``.
+
+    Transient failures (timeouts, 5xx) are retried with backoff. A definitive non-200 —
+    e.g. a 404 for a year NIRF hasn't published — is translated into a self-explanatory
+    :class:`~scrape.errors.ScrapeError` naming the year and URL, rather than leaking a raw
+    ``httpx.HTTPStatusError``.
+    """
     url = NIRF_URL.format(year=year)
     with httpx.Client(
         timeout=timeout,
         headers={"User-Agent": "jars-lib/0.1 (+offline nirf archive)"},
         follow_redirects=True,
     ) as client:
-        resp = client.get(url)
-        resp.raise_for_status()
+
+        def do() -> httpx.Response:
+            resp = client.get(url)
+            resp.raise_for_status()
+            return resp
+
+        try:
+            resp = with_retry(do, description=f"fetching NIRF Engineering {year}")
+        except httpx.HTTPStatusError as exc:
+            raise ScrapeError(
+                f"NIRF Engineering {year} could not be fetched: the server returned "
+                f"{exc.response.status_code} for {url}. That year may not be published "
+                "yet — try an earlier year with --nirf-year."
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise ScrapeError(
+                f"Could not reach NIRF for {year} ({url}): {exc}."
+            ) from exc
         return parse_nirf_table(resp.text, year=year)

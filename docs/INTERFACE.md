@@ -28,9 +28,8 @@ from jars_lib import (
     feasibility,     # admit-likelihood score for a single rank/closing-rank pair
     Cutoff,          # dataclass: one JoSAA opening/closing rank row
     NirfScore,       # dataclass: one NIRF Engineering ranking entry
-    Recommendation,  # dataclass: one scored program suggestion
+    Recommendation,  # dataclass: one ranked program suggestion
     Paths,           # file-path resolver
-    DEFAULT_ALPHA,   # default alpha weight (0.5)
     INSTITUTE_TYPES, # ("IIT", "NIT", "IIIT", "GFTI")
     IIT_TYPES,       # frozenset: {"IIT"}
     NON_IIT_TYPES,   # frozenset: {"NIT", "IIIT", "GFTI"}
@@ -91,7 +90,6 @@ engine.recommend(
     institute_types: set[str] | None = None,
     year: int | None = None,
     round: int | None = None,
-    alpha: float = 0.5,
     limit: int | None = None,
 ) -> list[Recommendation]
 ```
@@ -107,14 +105,14 @@ engine.recommend(
 | `gender` | `str` | `GENDER_NEUTRAL` or `GENDER_FEMALE` (female candidates may use either) |
 | `home_state` | `str \| None` | When provided, home-state quota seats at NITs/IIITs/GFTIs are included |
 | `institute_types` | `set[str] \| None` | Restrict to a subset of `{"IIT", "NIT", "IIIT", "GFTI"}`; `None` = all |
-| `year` | `int \| None` | Cutoff year to use; defaults to the latest year in the dataset |
-| `round` | `int \| None` | Counselling round to use; defaults to the latest round for the chosen year |
-| `alpha` | `float` | Scoring weight in [0, 1]: `1.0` = pure feasibility, `0.0` = pure NIRF quality |
+| `year` | `int \| None` | Pin to a specific cutoff year; `None` (default) considers all years |
+| `round` | `int \| None` | Pin to a specific counselling round; `None` (default) uses each year's highest round |
 | `limit` | `int \| None` | Cap the number of results returned |
 
-**Returns** a list of `Recommendation` objects sorted by `score` descending.
+**Returns** a list of `Recommendation` objects sorted by `score` descending (see the
+Scoring Algorithm in `docs/DESIGN.md`).
 
-**Raises** `ValueError` if neither rank is provided, or if `alpha` is outside [0, 1].
+**Raises** `ValueError` if neither rank is provided.
 
 ---
 
@@ -123,17 +121,32 @@ engine.recommend(
 ```python
 @dataclass
 class Recommendation:
-    cutoff: Cutoff           # the underlying program row
-    nirf_rank: int | None    # NIRF Engineering rank (1 = best), or None if not ranked
-    nirf_score: float | None # NIRF score on 0–100 scale, or None
-    feasibility: float       # admit likelihood in [0, 1]
-    nirf_norm: float         # nirf_score / 100, in [0, 1]; 0.0 if not in NIRF
-    score: float             # alpha * feasibility + (1 - alpha) * nirf_norm
+    cutoff: Cutoff                    # most-recent year's row (identity/back-reference)
+    nirf_rank: int | None             # NIRF Engineering rank (1 = best), latest dataset
+    nirf_score: float | None          # NIRF score on 0–100 scale, or None
+    feasibility: float                # recency-weighted admit likelihood in [0, 1] ("Chance")
+    score: float                      # ranking key in [0, 1] (weighted blend — see DESIGN.md)
+    rank_closing: float | None        # recency-weighted closing rank (used in scoring)
+    rank_opening: float | None        # recency-weighted opening rank (used in scoring)
+    in_range_years: list[int]         # years candidate's rank was within open..close, recent→old
+    window_years: list[int]           # years the closing rank was in the candidate's ±range window
+    opening_rank_min: int | None      # smallest opening rank across the display band
+    opening_rank_min_year: int | None # year of opening_rank_min
+    closing_rank_max: int | None      # largest closing rank across the display band
+    closing_rank_max_year: int | None # year of closing_rank_max
+
+    # derived properties (not constructor arguments):
+    # band_in_range: bool     — True when Open/Close reflect in-range years; False for reach fallback
+    # band_years: list[int]   — in_range_years if any, else window_years
 ```
 
-`r.cutoff` is a `Cutoff` with fields: `year`, `round`, `institute_type`,
-`institute_name`, `program_name`, `quota`, `seat_type`, `gender`, `opening_rank`,
-`closing_rank`.
+A recommendation summarises one program across **all available years**. `cutoff` holds
+the most-recent year's row for identity. The **display band** (`opening_rank_min`,
+`closing_rank_max`, `band_years`) shows in-range years when the rank cleared the cutoff,
+or the window years (reach years) otherwise — so reaches are never displayed as blank.
+
+`r.cutoff` has fields: `year`, `round`, `institute_type`, `institute_name`,
+`program_name`, `quota`, `seat_type`, `gender`, `opening_rank`, `closing_rank`.
 
 Both `Cutoff` and `Recommendation` expose a `.to_dict()` method that returns a plain
 `dict[str, Any]` suitable for JSON serialisation or DataFrame construction.
@@ -198,7 +211,6 @@ results = recommend(
     rank=5000,
     rank_range=2000,
     seat_type="OPEN",
-    alpha=0.5,
     data=df,                       # cutoffs DataFrame
     nirf_by_institute={...},       # {institute_name: (nirf_rank, nirf_score)}
     limit=20,
@@ -212,8 +224,12 @@ than through the storage layer. The DataFrame schema must match `constants.CUTOF
 
 ## Data Directory
 
-By default the library reads data from `data/` in the repository root. Override it with
-the `JARS_DATA_DIR` environment variable:
+The data directory is resolved with three-level precedence:
+1. `$JARS_DATA_DIR` environment variable (explicit override).
+2. The source-tree `data/` directory — used when running from an editable checkout.
+3. `platformdirs.user_data_dir("jars")` — a writable per-user location for installed wheels.
+
+Override via the environment variable:
 
 ```bash
 JARS_DATA_DIR=/path/to/my/data python my_app.py
@@ -265,11 +281,14 @@ import pandas as pd
 
 paths = Paths(root=Path("/my/data"))
 
-# Cutoffs: provide a DataFrame with columns matching CUTOFF_COLUMNS
+# Cutoffs: provide a DataFrame with columns matching CUTOFF_COLUMNS.
+# save_cutoffs automatically abbreviates institute names (IIT/NIT/IIIT prefixes) and
+# program names (Bachelor of Technology → B.Tech., etc.) as data enters the store.
 df = pd.DataFrame([...])
 storage.save_cutoffs(df, paths)
 
-# NIRF scores:
+# NIRF scores: institute names are also abbreviated on save to stay consistent with
+# the cutoffs store.
 scores = [NirfScore(year=2024, institute_name="...", nirf_rank=1, nirf_score=85.2)]
 storage.save_nirf(scores, paths)
 
@@ -311,14 +330,12 @@ def recommend():
     adv_rank   = request.args.get("adv_rank",   type=int)
     rank_range = request.args.get("range",  2000, type=int)
     seat_type  = request.args.get("category", "OPEN")
-    alpha      = request.args.get("alpha",  0.5, type=float)
 
     results = engine.recommend(
         rank_range=rank_range,
         jee_adv_rank=adv_rank,
         jee_mains_rank=mains_rank,
         seat_type=seat_type,
-        alpha=alpha,
         limit=50,
     )
     return jsonify([r.to_dict() for r in results])
