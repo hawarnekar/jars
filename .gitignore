@@ -1,25 +1,14 @@
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-.eggs/
-build/
-dist/
-
-# Virtual envs
-.venv/
-venv/
-env/
-
-# Parquet files outside the data directory
-*.parquet
-!data/*.parquet
-
-# Tooling caches
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
+# Root-level ignores for the jars monorepo.
+# Project-specific ignores live in jars-cli/.gitignore and jars-web/.gitignore.
 
 # OS / editor
 .DS_Store
 *.swp
+
+# Claude harness local state
+.claude/scheduled_tasks.lock
+
+# Node (jars-web)
+node_modules/
+jars-web/dist/
+*.log
