@@ -28,6 +28,9 @@ cd ../jars-web && npm run gen:data        # wraps jars-cli/tools/build_web_data.
 git add -A && git commit -m "data: refresh JoSAA/NIRF" && git push
 ```
 
+Builds and deploys happen via GitHub Actions (`.github/workflows/deploy-web.yml`). One-time
+setup on GitHub: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+
 See [`jars-cli/README.md`](jars-cli/README.md) and [`jars-web/README.md`](jars-web/README.md)
 for details.
 

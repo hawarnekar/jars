@@ -349,3 +349,35 @@ def recommend():
 `RecoEngine` is read-only after construction and is safe to share across threads.
 `load_data()` and storage writes are not thread-safe if multiple threads write to the
 same data directory simultaneously.
+
+---
+
+## The Web Port (`jars-web`)
+
+GitHub Pages is static, so `jars_lib` cannot run server-side for the web UI. Instead the
+sibling [`jars-web`](../../jars-web) app:
+
+1. **Pre-builds a compact dataset offline.** `tools/build_web_data.py` loads the engine and
+   reuses its *own* reductions — `jars_lib.recommend._yearly_reps` to collapse the cutoffs to
+   one row per (program, year), and `RecoEngine._nirf_lookup` to pre-join NIRF — then emits a
+   columnar, dictionary-encoded JSON (~88k rows, ~0.5 MB gzipped). Because the export reuses
+   the library's functions, the web data is exactly what the Python engine sees.
+
+   ```bash
+   python jars-cli/tools/build_web_data.py        # writes jars-web/public/data + goldens
+   ```
+
+   Two subtleties the exporter handles for correctness: `institute_type` is **per row** (it is
+   part of the engine key and a few institutes were reclassified across years, e.g. IIEST
+   Shibpur GFTI→NIT), and `institute_state` is resolved the same way `recommend._filter` does
+   (stored value, else the `INSTITUTE_STATE` name-map fallback). It does **not** support the
+   `round` argument — pinning a round can't be reproduced from round-collapsed data — which is
+   fine because the web UI (like the TUI) has no round selector.
+
+2. **Runs a TypeScript port of the engine** (`jars-web/src/engine/`) that mirrors
+   `recommend.py` / `engine.py` function-for-function.
+
+3. **Guarantees parity** via golden tests: `build_web_data.py` also emits query specs with
+   their `engine.recommend(...).to_dict()` output, and `jars-web/tests/engine.parity.test.ts`
+   asserts the TS engine reproduces them. **If you change the scoring algorithm here,
+   regenerate the dataset/goldens and run the web tests** — they will fail on any divergence.
