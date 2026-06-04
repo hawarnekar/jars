@@ -6,7 +6,7 @@
   "description": "Static web UI for jars — the JEE Admission Recommendation System",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
