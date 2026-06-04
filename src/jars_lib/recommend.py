@@ -45,7 +45,11 @@ import pandas as pd
 from .constants import (
     GENDER_FEMALE,
     GENDER_NEUTRAL,
+    INSTITUTE_STATE,
+    QUOTA_ALL_INDIA,
     QUOTA_HOME_STATE,
+    QUOTA_OTHER_STATE,
+    shorten_institute_name,
 )
 from .models import Cutoff, Recommendation
 
@@ -228,11 +232,37 @@ def _filter(
     if institute_types:
         out = out[out["institute_type"].isin(institute_types)]
 
-    # Home-state quota: only usable when the candidate names a home state. Without it,
-    # HS seats confer no advantage, so we drop them (keep AI / OS). (Verifying the
-    # institute's own state is a future refinement — see plan "Open / deferred".)
-    if not home_state:
-        out = out[out["quota"] != QUOTA_HOME_STATE]
+    if home_state:
+        # Determine each row's institute state: prefer the stored column, fall back to
+        # the static mapping (applying name shortening so unshortened fixture names match).
+        if "institute_state" in out.columns:
+            inst_state = out["institute_state"].fillna("").astype(str)
+            # Where the stored value is empty, derive from the name via the static mapping.
+            empty = inst_state == ""
+            if empty.any():
+                derived = out.loc[empty, "institute_name"].map(
+                    lambda n: INSTITUTE_STATE.get(shorten_institute_name(str(n)), "")
+                    if isinstance(n, str) else ""
+                )
+                inst_state = inst_state.copy()
+                inst_state[empty] = derived
+        else:
+            inst_state = out["institute_name"].map(
+                lambda n: INSTITUTE_STATE.get(shorten_institute_name(str(n)), "")
+                if isinstance(n, str) else ""
+            )
+        hs_norm = home_state.strip().lower()
+        in_home = inst_state.str.strip().str.lower() == hs_norm
+        # Keep: AI quota always; HS where institute is in home state; OS where it is not;
+        # any other special quotas (JK, GO, AP, LA) pass through unchanged.
+        _main_quotas = {QUOTA_ALL_INDIA, QUOTA_HOME_STATE, QUOTA_OTHER_STATE}
+        out = out[
+            ~out["quota"].isin(_main_quotas) |
+            (out["quota"] == QUOTA_ALL_INDIA) |
+            ((out["quota"] == QUOTA_HOME_STATE) & in_home) |
+            ((out["quota"] == QUOTA_OTHER_STATE) & ~in_home)
+        ]
+    # No home state: keep all quotas (HS, OS, AI, and special state quotas).
 
     return out
 

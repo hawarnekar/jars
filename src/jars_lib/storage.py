@@ -18,7 +18,7 @@ from typing import Any, Iterable
 import pandas as pd
 
 from .config import Paths
-from .constants import CUTOFF_COLUMNS, shorten_institute_name, shorten_program_name
+from .constants import CUTOFF_COLUMNS, INSTITUTE_STATE, shorten_institute_name, shorten_program_name
 from .models import NirfScore
 
 log = logging.getLogger(__name__)
@@ -73,6 +73,7 @@ def _coerce_cutoffs(df: pd.DataFrame) -> pd.DataFrame:
         "quota",
         "seat_type",
         "gender",
+        "institute_state",
     ):
         df[col] = df[col].astype("string")
     return df
@@ -90,6 +91,12 @@ def save_cutoffs(df: pd.DataFrame, paths: Paths | None = None) -> None:
     coerced["program_name"] = coerced["program_name"].map(
         lambda n: shorten_program_name(n) if isinstance(n, str) else n
     ).astype("string")
+    # Derive institute_state from shortened name; existing values are preserved.
+    missing = coerced["institute_state"].isna()
+    coerced.loc[missing, "institute_state"] = coerced.loc[missing, "institute_name"].map(
+        lambda n: INSTITUTE_STATE.get(n, pd.NA) if isinstance(n, str) else pd.NA
+    )
+    coerced["institute_state"] = coerced["institute_state"].astype("string")
     _atomic_write_bytes(paths.cutoffs, lambda p: coerced.to_parquet(p, index=False))
 
 

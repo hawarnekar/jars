@@ -100,8 +100,14 @@ def test_gender_pool(engine):
 def test_home_state_quota_visibility(engine):
     without = engine.recommend(6000, jee_mains_rank=4000, seat_type="OPEN")
     with_hs = engine.recommend(6000, jee_mains_rank=4000, seat_type="OPEN", home_state="Rajasthan")
-    assert all(r.cutoff.quota != "HS" for r in without)
+    # No home state: both HS and OS quotas are now surfaced (user sees full picture).
+    without_quotas = {r.cutoff.quota for r in without}
+    assert "HS" in without_quotas
+    assert "OS" in without_quotas
+    # With Rajasthan: HS quota for Rajasthan institutes (Malaviya NIT Jaipur), OS for others.
     assert any(r.cutoff.quota == "HS" for r in with_hs)
+    hs_names = {r.cutoff.institute_name for r in with_hs if r.cutoff.quota == "HS"}
+    assert any("Jaipur" in n or "Malaviya" in n for n in hs_names)
 
 
 def test_institute_type_filter_restricts(engine):

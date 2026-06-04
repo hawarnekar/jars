@@ -13,7 +13,7 @@ import textwrap
 import logging
 
 from jars_lib import load_data
-from jars_lib.constants import GENDER_FEMALE, GENDER_NEUTRAL, INSTITUTE_TYPES, SEAT_TYPES
+from jars_lib.constants import GENDER_FEMALE, GENDER_NEUTRAL, INDIAN_STATES, INSTITUTE_TYPES, SEAT_TYPES
 from jars_lib.engine import RecoEngine
 from jars_lib.storage import empty_cutoffs
 from jars_lib.update import update_database
@@ -21,6 +21,7 @@ from jars_lib.update import update_database
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.events import Key
 from textual.widgets import (
     Button,
     DataTable,
@@ -132,8 +133,13 @@ class RecoApp(App):
                 with Horizontal(classes="row"):
                     yield Label("Female-only seats ")
                     yield Switch(id="female")
-                yield Label("Home state (optional)")
-                yield Input(placeholder="e.g. Rajasthan", id="home_state")
+                yield Label("Home state (for HS/OS quota)")
+                yield Select(
+                    [(s, s) for s in INDIAN_STATES],
+                    prompt="(No home state — show both)",
+                    id="home_state",
+                    allow_blank=True,
+                )
                 yield Label("Institute types")
                 yield Select(
                     [("All", "ALL")] + [(t, t) for t in INSTITUTE_TYPES],
@@ -149,6 +155,10 @@ class RecoApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
+        # Remove the results table from the tab order so Tab/Shift-Tab cycle only
+        # through the form inputs. Arrow keys navigate the table via on_key below.
+        self.query_one("#table", DataTable).can_focus = False
+
         if self._load_error is not None:
             self._render([])  # set up columns even with no data
             self.notify(
@@ -173,6 +183,19 @@ class RecoApp(App):
             self._render(self._recs)
         except Exception:  # pragma: no cover - table may not exist yet very early
             pass
+
+    def on_key(self, event: Key) -> None:
+        if event.key not in ("up", "down"):
+            return
+        # Let Select dropdowns handle their own Up/Down for option navigation.
+        if any(sel.expanded for sel in self.query(Select)):
+            return
+        event.prevent_default()
+        table = self.query_one("#table", DataTable)
+        if event.key == "up":
+            table.action_cursor_up()
+        else:
+            table.action_cursor_down()
 
     def _status_text(self) -> str:
         meta = self.engine.meta or {}
@@ -220,7 +243,8 @@ class RecoApp(App):
 
         category = self.query_one("#category", Select).value
         female = self.query_one("#female", Switch).value
-        home_state = self.query_one("#home_state", Input).value.strip() or None
+        home_state_val = self.query_one("#home_state", Select).value
+        home_state = None if home_state_val is Select.BLANK else str(home_state_val)
         types_val = self.query_one("#types", Select).value
 
         institute_types = None if types_val == "ALL" else {types_val}
