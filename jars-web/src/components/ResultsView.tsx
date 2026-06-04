@@ -20,6 +20,7 @@ import {
   TREND_LABEL,
   trendTone,
 } from "../lib/format";
+import { COLUMN_TOOLTIPS } from "../content/notes";
 import { RowDetail } from "./RowDetail";
 
 const col = createColumnHelper<Recommendation>();
@@ -111,6 +112,7 @@ export function ResultsView({ results, dataset }: Props) {
                   <th
                     key={h.id}
                     onClick={h.column.getToggleSortingHandler()}
+                    title={COLUMN_TOOLTIPS[h.column.id]}
                     className="cursor-pointer select-none px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                   >
                     {flexRender(h.column.columnDef.header, h.getContext())}
