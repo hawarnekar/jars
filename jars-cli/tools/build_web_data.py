@@ -33,7 +33,12 @@ from typing import Any
 import pandas as pd
 
 from jars_lib import load_data
-from jars_lib.constants import GENDER_FEMALE, GENDER_NEUTRAL
+from jars_lib.constants import (
+    GENDER_FEMALE,
+    GENDER_NEUTRAL,
+    INSTITUTE_STATE,
+    shorten_institute_name,
+)
 from jars_lib.recommend import _KEY_COLS, _yearly_reps  # reuse the engine's own reduction
 
 # Bump when the on-disk schema changes; the filename carries the major version so the
@@ -92,13 +97,21 @@ def build_dataset(engine) -> dict[str, Any]:
     inst_meta: dict[int, dict[str, Any]] = {}
 
     col_inst: list[int] = []
+    col_itype: list[int] = []
     col_prog: list[int] = []
     col_quota: list[int] = []
     col_seat: list[int] = []
     col_gender: list[int] = []
     col_year: list[int] = []
+    col_round: list[int] = []
     col_open: list[int | None] = []
     col_close: list[int] = []
+
+    # institute_type is NOT constant per institute: a few institutes were reclassified
+    # across years (e.g. IIEST Shibpur GFTI -> NIT), and the engine's grouping key includes
+    # institute_type — so it must be a per-row column, not per-institute metadata. NIRF and
+    # state, however, are keyed by institute_name in the engine, so they stay per-institute.
+    raw_state: dict[int, str | None] = {}  # best (non-empty) stored state seen per institute
 
     # Iterate in a deterministic order so output is byte-stable across runs (clean diffs).
     reps = reps.sort_values(_KEY_COLS + ["year"]).reset_index(drop=True)
@@ -107,26 +120,38 @@ def build_dataset(engine) -> dict[str, Any]:
         name = str(row.institute_name)
         iid = institutes.id(name)
         if iid not in inst_meta:
-            state = row.institute_state
-            state = str(state) if isinstance(state, str) and state else None
             nirf = nirf_lookup.get(name)
             inst_meta[iid] = {
-                "type": inst_types.id(str(row.institute_type)),
-                "state": states.id(state) if state is not None else -1,
                 "nirf_rank": int(nirf[0]) if nirf else None,
                 "nirf_score": round(float(nirf[1]), 2) if nirf else None,
             }
+            raw_state[iid] = None
+        # Track the first non-empty stored state for this institute (engine prefers it).
+        if raw_state[iid] is None:
+            st = row.institute_state
+            if isinstance(st, str) and st:
+                raw_state[iid] = st
 
         col_inst.append(iid)
+        col_itype.append(inst_types.id(str(row.institute_type)))
         col_prog.append(programs.id(str(row.program_name)))
         col_quota.append(quotas.id(str(row.quota)))
         col_seat.append(seats.id(str(row.seat_type)))
         col_gender.append(genders.id(str(row.gender)))
         col_year.append(int(row.year))
+        col_round.append(_opt_int(row.round) or 0)
         col_open.append(_opt_int(row.opening_rank))
         col_close.append(int(row.closing_rank))
 
-    institute_table = [inst_meta[i] for i in range(len(institutes.values))]
+    # Resolve each institute's state exactly as the engine's _filter does: the stored value
+    # if present, otherwise the static INSTITUTE_STATE map keyed by the shortened name.
+    institute_table = []
+    for i in range(len(institutes.values)):
+        name = institutes.values[i]
+        state = raw_state.get(i) or INSTITUTE_STATE.get(shorten_institute_name(name))
+        meta_i = inst_meta[i]
+        meta_i["state"] = states.id(state) if state else -1
+        institute_table.append(meta_i)
 
     meta = dict(engine.meta or {})
     meta.update(
@@ -155,11 +180,13 @@ def build_dataset(engine) -> dict[str, Any]:
         "institutes": institute_table,
         "rows": {
             "inst": col_inst,
+            "itype": col_itype,
             "prog": col_prog,
             "quota": col_quota,
             "seat": col_seat,
             "gender": col_gender,
             "year": col_year,
+            "round": col_round,
             "open": col_open,
             "close": col_close,
         },
@@ -184,7 +211,7 @@ _GOLDEN_SPECS: list[dict[str, Any]] = [
     {"rank_range": 2000, "jee_mains_rank": 25000, "institute_types": ["IIIT", "GFTI"]},
     {"rank_range": 1500, "jee_adv_rank": 8000, "institute_types": ["IIT"]},
     {"rank_range": 2000, "jee_mains_rank": 25000, "year": 2024},
-    {"rank_range": 2000, "jee_mains_rank": 25000, "year": 2023, "round": 6},
+    {"rank_range": 2000, "jee_mains_rank": 25000, "year": 2022},
     {"rank_range": 500, "jee_mains_rank": 100000, "seat_type": "OBC-NCL", "limit": 25},
     {"rank_range": 10000, "jee_mains_rank": 5000, "seat_type": "OPEN"},
     {"rank_range": 2000, "jee_adv_rank": 500},
