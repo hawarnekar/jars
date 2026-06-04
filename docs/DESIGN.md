@@ -62,6 +62,7 @@ One row from the JoSAA opening/closing-rank archive:
 | `gender` | `str` | `Gender-Neutral` or `Female-only (including Supernumerary)` |
 | `opening_rank` | `int \| None` | |
 | `closing_rank` | `int \| None` | |
+| `institute_state` | `str \| None` | Indian state where the institute is located; derived from the institute name via a static mapping and stored in the parquet on save |
 
 ### `NirfScore`
 One NIRF Engineering ranking entry:
@@ -250,6 +251,14 @@ apply the same institute abbreviation so names stay consistent across all three 
 The shortening functions (`shorten_institute_name`, `shorten_program_name`) live in
 `constants.py` and are idempotent.
 
+**`institute_state` derivation** — after name shortening, `save_cutoffs` populates an
+`institute_state` column by looking up each shortened institute name in `INSTITUTE_STATE`
+(a static dict in `constants.py` covering all ~130 JEE institutes). The column is stored
+in the parquet so downstream consumers can read it directly. At query time, `_filter` in
+`recommend.py` also falls back to the same mapping (with name shortening applied on the
+fly) for DataFrames that don't have the column pre-populated — so the host-state logic
+works correctly whether data was loaded from the parquet or constructed in memory for tests.
+
 **Atomic writes** — every save writes to a temp file in the same directory, then calls
 `os.replace()` to atomically rename it over the target. An interrupted update never
 leaves a partially-written file.
@@ -339,7 +348,9 @@ status updates.
 `tui/jars_tui/app.py` — `RecoApp(App)`:
 
 - **Left panel** (`#form`): a `VerticalScroll` containing labelled `Input` and `Select`
-  widgets for rank, range, category, gender, home state, and institute types.
+  widgets for rank, range, category, gender, home state, and institute types. The home
+  state field is a `Select` dropdown listing all 36 Indian states and UTs (avoiding
+  free-text spelling errors). Tab and Shift-Tab cycle only through these form widgets.
 - **Right panel** (`#results`): a `DataTable` with two flexible-width columns (Institute,
   Program) that reflow on terminal resize, plus fixed-width columns: `Category`, `Quota`,
   `Open` (smallest opening rank across the display band, with its year), `Close` (largest
@@ -355,6 +366,13 @@ status updates.
 
 Text wrapping in cells uses `textwrap.wrap()` capped at 6 lines; the `DataTable` row
 height is set to the maximum wrapped line count of the two flexible columns.
+
+**Keyboard navigation** — the `DataTable` is excluded from the Tab order (`can_focus =
+False` set in `on_mount`) so Tab/Shift-Tab always stay within the form. Up/Down arrow
+keys are intercepted at the App level via `on_key` and forwarded to `table.action_cursor_up/down()`,
+so the highlighted result row moves regardless of which form widget has focus. The only
+exception: when a `Select` dropdown is open (`sel.expanded` is True), Up/Down are passed
+through untouched so dropdown option navigation works normally.
 
 The live scrape (`action_update`) runs in a `@work(thread=True)` worker to avoid
 blocking the event loop. Progress messages are pushed back to the UI thread with

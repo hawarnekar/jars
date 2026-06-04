@@ -120,7 +120,7 @@ jars-lib info
 | `--range N` | 2000 | ± window around your rank to search |
 | `--category CAT` | OPEN | Seat type: `OPEN`, `OBC-NCL`, `SC`, `ST`, `EWS` (append `(PwD)` for PwD variants) |
 | `--female` | off | Include female-only seats |
-| `--home-state STATE` | — | Enable home-state quota seats at NITs/IIITs/GFTIs |
+| `--home-state STATE` | — | Home state name (e.g. `Rajasthan`). When given, HS quota is shown for institutes in that state and OS quota for all others. Omitting it shows both HS and OS. |
 | `--types LIST` | all | Comma-separated filter: `IIT`, `NIT`, `IIIT`, `GFTI` |
 | `--year Y` | all years | Pin results to a specific data year |
 | `--round R` | latest round for year | Pin results to a specific counselling round |
@@ -189,7 +189,7 @@ pytest
 ## Notes
 
 - Cutoff data covers historical JoSAA results (currently 2016–2025). Recommendations show the years your rank fell within a program's opening/closing band and weight recent years more heavily — use as a guide, not a guarantee.
-- Home-state quota seats are shown only when `--home-state` is supplied.
+- When `--home-state` is supplied, the engine shows HS quota for institutes located in that state and OS quota for all others. Without it, both HS and OS rows are included so you see the full picture.
 - NIRF covers the Engineering list only; since NIRF rank is the primary sort key, institutes not in NIRF are ranked after all NIRF-ranked ones.
 - A full multi-year scrape can take many minutes. Scope it with `--years`/`--rounds`/`--types`.
 - The live JoSAA scrape requires Playwright because the archive endpoint rejects plain HTTP form posts.

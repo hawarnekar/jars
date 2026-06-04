@@ -103,7 +103,7 @@ engine.recommend(
 | `jee_mains_rank` | `int \| None` | JEE Mains CRL rank (selects NIT/IIIT/GFTI seats) |
 | `seat_type` | `str` | Category, e.g. `"OPEN"`, `"OBC-NCL"`, `"SC"`, `"ST"`, `"EWS"`, or their `"(PwD)"` variants |
 | `gender` | `str` | `GENDER_NEUTRAL` or `GENDER_FEMALE` (female candidates may use either) |
-| `home_state` | `str \| None` | When provided, home-state quota seats at NITs/IIITs/GFTIs are included |
+| `home_state` | `str \| None` | When provided, HS quota is returned for institutes located in that state and OS quota for all others. When `None`, both HS and OS rows are included. |
 | `institute_types` | `set[str] \| None` | Restrict to a subset of `{"IIT", "NIT", "IIIT", "GFTI"}`; `None` = all |
 | `year` | `int \| None` | Pin to a specific cutoff year; `None` (default) considers all years |
 | `round` | `int \| None` | Pin to a specific counselling round; `None` (default) uses each year's highest round |
@@ -146,7 +146,8 @@ the most-recent year's row for identity. The **display band** (`opening_rank_min
 or the window years (reach years) otherwise — so reaches are never displayed as blank.
 
 `r.cutoff` has fields: `year`, `round`, `institute_type`, `institute_name`,
-`program_name`, `quota`, `seat_type`, `gender`, `opening_rank`, `closing_rank`.
+`program_name`, `quota`, `seat_type`, `gender`, `opening_rank`, `closing_rank`,
+`institute_state` (the Indian state where the institute is located, or `None` if unknown).
 
 Both `Cutoff` and `Recommendation` expose a `.to_dict()` method that returns a plain
 `dict[str, Any]` suitable for JSON serialisation or DataFrame construction.
