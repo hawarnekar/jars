@@ -125,7 +125,7 @@ class RecoApp(App):
                 yield Label("JEE Mains rank / CRL (for NITs/IIITs/GFTIs)")
                 yield Input(placeholder="e.g. 25000  (leave blank if not applicable)", id="mains_rank", type="integer")
                 yield Label("± rank range")
-                yield Input(value="2000", id="range", type="integer")
+                yield Input(value="200", id="range", type="integer")
                 yield Label("Category (seat type)")
                 yield Select(
                     [(s, s) for s in SEAT_TYPES], value="OPEN", id="category", allow_blank=False

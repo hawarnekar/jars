@@ -75,7 +75,7 @@ jars-lib recommend --mains-rank 25000 --range 5000 --category OBC-NCL
 jars-lib recommend --adv-rank 3000 --range 1000
 
 # Both IIT and non-IIT results together:
-jars-lib recommend --adv-rank 3000 --mains-rank 25000 --range 2000
+jars-lib recommend --adv-rank 3000 --mains-rank 25000 --range 200
 
 # Restrict to NITs only, include female-only seats, apply home-state quota:
 jars-lib recommend --mains-rank 25000 --types NIT --female --home-state Rajasthan
@@ -117,7 +117,7 @@ jars-lib info
 |---|---|---|
 | `--adv-rank RANK` | — | JEE Advanced rank (IIT seats) |
 | `--mains-rank RANK` | — | JEE Mains / CRL rank (NIT/IIIT/GFTI seats) |
-| `--range N` | 2000 | ± window around your rank to search |
+| `--range N` | 200 | ± window around your rank to search |
 | `--category CAT` | OPEN | Seat type: `OPEN`, `OBC-NCL`, `SC`, `ST`, `EWS` (append `(PwD)` for PwD variants) |
 | `--female` | off | Include female-only seats |
 | `--home-state STATE` | — | Home state name (e.g. `Rajasthan`). When given, HS quota is shown for institutes in that state and OS quota for all others. Omitting it shows both HS and OS. |

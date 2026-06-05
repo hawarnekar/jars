@@ -20,7 +20,7 @@ export interface Filters {
 export const DEFAULT_FILTERS: Filters = {
   advRank: "",
   mainsRank: "",
-  range: "2000",
+  range: "200",
   category: "OPEN",
   female: false,
   homeState: "",

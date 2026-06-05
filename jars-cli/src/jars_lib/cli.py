@@ -198,7 +198,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--mains-rank", type=int, default=None, metavar="RANK",
         help="JEE Mains rank / CRL (for NIT/IIIT/GFTI recommendations)",
     )
-    r.add_argument("--range", type=int, default=2000, help="+/- closing-rank window")
+    r.add_argument("--range", type=int, default=200, help="+/- closing-rank window")
     r.add_argument("--category", default="OPEN", help="seat type, e.g. OPEN, OBC-NCL, SC, ST, EWS")
     r.add_argument("--female", action="store_true", help="include female-only seats")
     r.add_argument("--home-state", default=None, help="enable home-state quota seats (NITs/IIITs/GFTIs)")

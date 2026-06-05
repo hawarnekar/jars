@@ -13,9 +13,9 @@ Example::
 
     engine = load_data()
     # IIT + non-IIT results together
-    results = engine.recommend(rank_range=2000, jee_adv_rank=3000, jee_mains_rank=25000)
+    results = engine.recommend(rank_range=200, jee_adv_rank=3000, jee_mains_rank=25000)
     # Only IIT (Advanced only)
-    results = engine.recommend(rank_range=2000, jee_adv_rank=3000)
+    results = engine.recommend(rank_range=200, jee_adv_rank=3000)
     # Only non-IIT (Mains only)
     results = engine.recommend(rank_range=5000, jee_mains_rank=25000)
 """

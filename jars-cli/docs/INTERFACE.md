@@ -60,7 +60,7 @@ lookup, and returns a `RecoEngine`. Call it once at startup and reuse the instan
 
 ```python
 results = engine.recommend(
-    rank_range=2000,
+    rank_range=200,
     jee_mains_rank=25000,
     seat_type="OBC-NCL",
 )
@@ -159,7 +159,7 @@ Both `Cutoff` and `Recommendation` expose a `.to_dict()` method that returns a p
 ```python
 import json
 
-results = engine.recommend(rank_range=2000, jee_mains_rank=25000)
+results = engine.recommend(rank_range=200, jee_mains_rank=25000)
 
 # To a list of dicts (JSON-serialisable):
 payload = [r.to_dict() for r in results]
@@ -210,7 +210,7 @@ import pandas as pd
 
 results = recommend(
     rank=5000,
-    rank_range=2000,
+    rank_range=200,
     seat_type="OPEN",
     data=df,                       # cutoffs DataFrame
     nirf_by_institute={...},       # {institute_name: (nirf_rank, nirf_score)}
@@ -329,7 +329,7 @@ engine = load_data()  # load once at startup
 def recommend():
     mains_rank = request.args.get("mains_rank", type=int)
     adv_rank   = request.args.get("adv_rank",   type=int)
-    rank_range = request.args.get("range",  2000, type=int)
+    rank_range = request.args.get("range",  200, type=int)
     seat_type  = request.args.get("category", "OPEN")
 
     results = engine.recommend(
