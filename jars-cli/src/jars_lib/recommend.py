@@ -167,13 +167,14 @@ def _order_key(rec: Recommendation) -> tuple[float, float, float, float]:
     return (-rec.score, nirf, closing, opening)
 
 
-def _closing_trend(years_rows: list[tuple[int, int, int | None, int]]) -> str | None:
+def _closing_trend(years_rows: list[tuple[int, int, int | None, int]]) -> str:
     """Trend direction of the closing rank across up to 5 most recent data years.
 
     Uses an ordinary least-squares slope of ``(year, closing_rank)``. A positive slope
     means the cutoff rank is rising over time (program becoming **more accessible** — fewer
     candidates are picking it). A negative slope means the cutoff is falling (program
-    becoming **more competitive**). Returns ``None`` when fewer than 2 data years exist.
+    becoming **more competitive**). Returns ``"stable"`` when fewer than 2 data years
+    exist (no slope can be estimated).
 
     Threshold: ≥ 3% per year relative change is "easing" / "tighter"; below that is
     "stable". The threshold filters year-to-year noise in small data windows.

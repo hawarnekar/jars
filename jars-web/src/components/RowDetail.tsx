@@ -62,7 +62,7 @@ export function RowDetail({ rec, dataset }: Props) {
             label="Wtd. opening"
             value={rec.rank_opening !== null ? Math.round(rec.rank_opening).toLocaleString("en-IN") : "—"}
           />
-          <Metric label="NIRF rank" value={rec.nirf_rank ?? "—"} />
+          <Metric label="NIRF rank" value={rec.nirf_rank ?? "Unranked"} />
           <Metric label="NIRF score" value={rec.nirf_score ?? "—"} />
         </dl>
       </div>

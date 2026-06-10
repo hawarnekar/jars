@@ -16,8 +16,15 @@ export function useDarkMode(): [boolean, () => void] {
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
-    localStorage.setItem(STORAGE_KEY, dark ? "dark" : "light");
   }, [dark]);
 
-  return [dark, () => setDark((d) => !d)];
+  // Persist only on an explicit toggle, so an untouched theme keeps following the OS.
+  const toggle = () =>
+    setDark((d) => {
+      const next = !d;
+      localStorage.setItem(STORAGE_KEY, next ? "dark" : "light");
+      return next;
+    });
+
+  return [dark, toggle];
 }

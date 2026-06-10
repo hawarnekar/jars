@@ -27,8 +27,8 @@ export const DEFAULT_FILTERS: Filters = {
   instituteType: "ALL",
 };
 
-/** Max results to compute — matches the TUI's cap. */
-export const RESULT_LIMIT = 300;
+/** Max results to compute — the shared cap across web, TUI, and CLI (`--limit` default). */
+export const RESULT_LIMIT = 200;
 
 export interface ValidationError {
   message: string;

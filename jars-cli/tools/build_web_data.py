@@ -154,9 +154,15 @@ def build_dataset(engine) -> dict[str, Any]:
         institute_table.append(meta_i)
 
     meta = dict(engine.meta or {})
+    # Derive generated_at from the store's last_updated stamp (not the wall clock) so
+    # rebuilding from the same store is byte-identical — CI regenerates the dataset and
+    # fails on any diff, catching a data refresh that forgot `npm run gen:data`.
+    generated_at = meta.get("last_updated") or datetime.now(timezone.utc).isoformat(
+        timespec="seconds"
+    )
     meta.update(
         schema_version=SCHEMA_VERSION,
-        generated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        generated_at=generated_at,
         row_count=len(col_close),
         institute_count=len(institutes.values),
         program_count=len(programs.values),

@@ -20,6 +20,23 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: pytest -q
 
+  # Guard against publishing a stale web dataset: if jars-cli/data was refreshed without
+  # re-running `npm run gen:data`, the regenerated dataset/golden files differ from the
+  # committed ones and this job fails. The exporter is deterministic for a given store
+  # (generated_at derives from the store's last_updated stamp), so a clean diff means
+  # the committed web data matches the parquet store exactly.
+  data-sync:
+    name: web dataset in sync with jars-cli data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ./jars-cli
+      - run: python jars-cli/tools/build_web_data.py
+      - run: git diff --exit-code -- jars-web/public/data jars-web/tests/golden
+
   web:
     name: jars-web (typecheck, parity, build)
     runs-on: ubuntu-latest

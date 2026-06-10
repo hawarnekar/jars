@@ -124,7 +124,7 @@ jars-lib info
 | `--types LIST` | all | Comma-separated filter: `IIT`, `NIT`, `IIIT`, `GFTI` |
 | `--year Y` | all years | Pin results to a specific data year |
 | `--round R` | latest round for year | Pin results to a specific counselling round |
-| `--limit N` | 30 | Maximum results to print |
+| `--limit N` | 200 | Maximum results to print (same cap as the TUI and web app) |
 
 Ordering is by a weighted score: **NIRF rank** (weight 0.6), **recency-weighted closing
 rank** (0.3), and **recency-weighted opening rank** (0.1), each normalised so lower ranks

@@ -55,7 +55,7 @@ export const ALL_NOTES: Note[] = [
   {
     title: "Institutes without a NIRF rank appear lower",
     body:
-      "NIRF covers only the Engineering list, and it's the primary sort key — so an institute absent from NIRF ranks below NIRF-listed ones. A missing NIRF rank does not mean the institute is poor.",
+      "NIRF covers only the Engineering list, and it's the primary sort key — so an institute absent from NIRF (shown as “Unranked” in the NIRF column) sorts below NIRF-listed ones, even when its cutoffs are competitive. A missing NIRF rank does not mean the institute is poor.",
   },
   {
     title: "Home-state quota depends on your domicile",
@@ -70,7 +70,7 @@ export const COLUMN_TOOLTIPS: Record<string, string> = {
   close: "Largest closing rank across the shown years (with the year it occurred).",
   years:
     "Years your rank fell within that program's opening–closing band. A ~ prefix marks near-window reach years your rank did not clear.",
-  nirf: "NIRF Engineering rank (1 = best). Blank means the institute is not in the NIRF list.",
+  nirf: "NIRF Engineering rank (1 = best). “Unranked” means the institute is not in the NIRF list — it gets no NIRF credit in the ranking score, so it sorts lower even with competitive cutoffs.",
   chance:
     "Recency-weighted admit likelihood — how comfortably your rank cleared past closing ranks. Display only; does not affect ordering.",
   trend:

@@ -42,7 +42,7 @@ _NARROW_COLUMNS = [
     ("Open",     13),  # smallest opening rank across years, with its year
     ("Close",    13),  # largest closing rank across years, with its year
     ("Years",    18),  # years the rank was in range, recent→old
-    ("NIRF",      5),
+    ("NIRF",      8),  # rank, or "unranked" for institutes absent from NIRF
     ("Chance",    7),  # recency-weighted admit likelihood, as a %
     ("Trend",     7),  # closing-rank trend: easing / tighter / stable
 ]
@@ -312,7 +312,7 @@ class RecoApp(App):
                 _fmt_rank_year(r.opening_rank_min, r.opening_rank_min_year),
                 _fmt_rank_year(r.closing_rank_max, r.closing_rank_max_year),
                 _fmt_years(r.band_years, reach=not r.band_in_range),
-                str(r.nirf_rank or "-"),
+                str(r.nirf_rank) if r.nirf_rank else "unranked",
                 f"{r.feasibility * 100:.0f}%",
                 r.closing_rank_trend or "-",
                 height=row_height,

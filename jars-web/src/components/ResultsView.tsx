@@ -56,7 +56,15 @@ const columns = [
     id: "nirf",
     header: "NIRF",
     sortUndefined: "last",
-    cell: (c) => c.row.original.nirf_rank ?? "—",
+    cell: (c) =>
+      c.row.original.nirf_rank ?? (
+        <span
+          className="italic text-slate-400 dark:text-slate-500"
+          title="Not in the NIRF Engineering list. The ranking score gives no NIRF credit, so this program sorts lower than NIRF-listed ones even with competitive cutoffs."
+        >
+          Unranked
+        </span>
+      ),
   }),
   col.accessor((r) => r.feasibility, {
     id: "chance",
@@ -171,7 +179,7 @@ export function ResultsView({ results, dataset }: Props) {
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
                   <span>{r.cutoff.seat_type} · {r.cutoff.quota}</span>
                   <span>Close {fmtRankYear(r.closing_rank_max, r.closing_rank_max_year)}</span>
-                  <span>NIRF {r.nirf_rank ?? "—"}</span>
+                  <span>{r.nirf_rank !== null ? `NIRF ${r.nirf_rank}` : "NIRF unranked"}</span>
                   <span className={chanceTone(r.feasibility)}>{fmtChance(r.feasibility)}</span>
                   <span className={trendTone(r.closing_rank_trend)}>
                     {r.closing_rank_trend ? TREND_LABEL[r.closing_rank_trend] : "—"}

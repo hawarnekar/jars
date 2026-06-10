@@ -16,7 +16,7 @@ import sys
 import httpx
 
 from .config import Paths
-from .constants import GENDER_FEMALE, GENDER_NEUTRAL, INSTITUTE_TYPES, SEAT_TYPES
+from .constants import GENDER_FEMALE, GENDER_NEUTRAL, INDIAN_STATES, INSTITUTE_TYPES, SEAT_TYPES
 from .engine import load_data
 from .scrape.errors import ScrapeError
 from .update import seed_demo, update_database
@@ -28,6 +28,34 @@ def _split(values: str | None) -> list[str] | None:
     return [v.strip() for v in values.split(",") if v.strip()]
 
 
+def _validate_types(types_list: list[str] | None) -> str | None:
+    """Return an error message if any institute type is unknown, else None."""
+    if not types_list:
+        return None
+    invalid = [t for t in types_list if t not in INSTITUTE_TYPES]
+    if invalid:
+        return (
+            f"unknown --types value(s): {', '.join(invalid)}. "
+            f"Valid values: {', '.join(INSTITUTE_TYPES)}."
+        )
+    return None
+
+
+def _canonical_state(value: str | None) -> str | None:
+    """Case-insensitively match a state name against INDIAN_STATES, or None if unknown.
+
+    The engine compares states case-insensitively, but an unknown name (a typo) would
+    silently drop all HS-quota rows — so we catch it here instead.
+    """
+    if value is None:
+        return None
+    needle = value.strip().lower()
+    for state in INDIAN_STATES:
+        if state.lower() == needle:
+            return state
+    return None
+
+
 def cmd_recommend(args: argparse.Namespace) -> int:
     # Input validation — catch bad values before they reach the engine.
     if args.category not in SEAT_TYPES:
@@ -36,15 +64,18 @@ def cmd_recommend(args: argparse.Namespace) -> int:
         return 2
 
     types_list = _split(args.types)
-    if types_list:
-        invalid = [t for t in types_list if t not in INSTITUTE_TYPES]
-        if invalid:
-            print(
-                f"Error: unknown --types value(s): {', '.join(invalid)}. "
-                f"Valid values: {', '.join(INSTITUTE_TYPES)}.",
-                file=sys.stderr,
-            )
-            return 2
+    if err := _validate_types(types_list):
+        print(f"Error: {err}", file=sys.stderr)
+        return 2
+
+    home_state = _canonical_state(args.home_state)
+    if args.home_state and home_state is None:
+        print(
+            f"Error: unknown --home-state {args.home_state!r}. Use the full state/UT name "
+            f"as listed by JoSAA, e.g. Maharashtra, Tamil Nadu, Delhi.",
+            file=sys.stderr,
+        )
+        return 2
 
     engine = load_data()
     if engine.is_empty:
@@ -71,7 +102,7 @@ def cmd_recommend(args: argparse.Namespace) -> int:
         jee_mains_rank=mains_rank,
         seat_type=args.category,
         gender=gender,
-        home_state=args.home_state,
+        home_state=home_state,
         institute_types=set(types_list) if types_list else None,
         year=args.year,
         round=args.round,
@@ -119,7 +150,7 @@ def _print_table(recs) -> None:
                 _fmt_rank_year(r.opening_rank_min, r.opening_rank_min_year),
                 _fmt_rank_year(r.closing_rank_max, r.closing_rank_max_year),
                 _fmt_years(r.band_years, reach=not r.band_in_range),
-                str(r.nirf_rank or "-"),
+                str(r.nirf_rank) if r.nirf_rank else "unranked",
                 f"{r.feasibility * 100:.0f}%",
                 r.closing_rank_trend or "-",
             ]
@@ -137,10 +168,15 @@ def _trim(text: str, n: int) -> str:
 
 
 def cmd_update(args: argparse.Namespace) -> int:
+    types_list = _split(args.types)
+    if err := _validate_types(types_list):
+        print(f"Error: {err}", file=sys.stderr)
+        return 2
+
     update_database(
         years=_split(args.years),
         rounds=_split(args.rounds),
-        institute_types=_split(args.types),
+        institute_types=types_list,
         nirf_year=args.nirf_year,
         delay=args.delay,
         backend=args.backend,
@@ -205,7 +241,8 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--types", default=None, help="comma list to restrict: IIT,NIT,IIIT,GFTI")
     r.add_argument("--year", type=int, default=None)
     r.add_argument("--round", type=int, default=None)
-    r.add_argument("--limit", type=int, default=30)
+    # Default cap shared with the TUI and the web app (RESULT_LIMIT in jars-web).
+    r.add_argument("--limit", type=int, default=200, help="maximum results to print")
     r.set_defaults(func=cmd_recommend)
 
     u = sub.add_parser("update", help="scrape JoSAA + NIRF into the offline store")
