@@ -113,6 +113,13 @@ def cmd_recommend(args: argparse.Namespace) -> int:
         return 0
 
     _print_table(recs)
+    safer = sum(r.padded for r in recs)
+    if safer:
+        print(
+            f"\n* Safer option: closes above your ±{args.range} range, so you would very "
+            f"likely get it. {len(recs) - safer} program(s) fell inside the range; the "
+            f"nearest {safer} above it were added."
+        )
     return 0
 
 
@@ -142,14 +149,14 @@ def _print_table(recs) -> None:
         c = r.cutoff
         rows.append(
             [
-                str(i),
+                f"{i}*" if r.padded else str(i),
                 _trim(c.institute_name, 38),
                 _trim(c.program_name, 34),
                 c.seat_type,
                 c.quota,
                 _fmt_rank_year(r.opening_rank_min, r.opening_rank_min_year),
                 _fmt_rank_year(r.closing_rank_max, r.closing_rank_max_year),
-                _fmt_years(r.band_years, reach=not r.band_in_range),
+                _fmt_years(r.band_years, reach=not (r.band_in_range or r.padded)),
                 str(r.nirf_rank) if r.nirf_rank else "unranked",
                 f"{r.feasibility * 100:.0f}%",
                 r.closing_rank_trend or "-",

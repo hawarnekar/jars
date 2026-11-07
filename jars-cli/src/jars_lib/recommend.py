@@ -24,6 +24,11 @@ disadvantage on a higher-weighted one. Components:
 
 Results are sorted by ``score`` descending (see :func:`_order_key` for the tie-break).
 
+**Padding.** If fewer than :data:`MIN_RESULTS` programs fall inside the ±range window, the
+list is padded up to that many with the *nearest programs closing above the window*
+(``Recommendation.padded``) — programs the candidate would very likely get. They always
+follow the in-window rows. Programs closing below the window (reaches) are never added.
+
 Each recommendation also carries, for display only (it does **not** affect ordering):
 
 * ``feasibility`` ("Chance") — a recency-weighted admit likelihood in [0, 1] derived from
@@ -57,6 +62,10 @@ from .models import Cutoff, Recommendation
 # k=6 => a closing rank 20% above the candidate's rank scores ~0.77 (comfortably safe);
 # 20% below scores ~0.23 (a reach).
 _FEASIBILITY_K = 6.0
+
+# When fewer than this many programs fall inside the ±range window, the result is padded up
+# to this many with the nearest programs that close *above* the window ("safer options").
+MIN_RESULTS = 10
 
 # Per-year weight decay used when blending per-year values (feasibility, and the closing /
 # opening ranks that drive ordering) into one recency-weighted number. A year that is `n`
@@ -165,6 +174,11 @@ def _order_key(rec: Recommendation) -> tuple[float, float, float, float]:
     closing = rec.rank_closing if rec.rank_closing is not None else math.inf
     opening = rec.rank_opening if rec.rank_opening is not None else math.inf
     return (-rec.score, nirf, closing, opening)
+
+
+def _final_key(rec: Recommendation) -> tuple:
+    """Final ordering: in-window rows first, padded ("safer option") rows after."""
+    return (rec.padded, *_order_key(rec))
 
 
 def _closing_trend(years_rows: list[tuple[int, int, int | None, int]]) -> str:
@@ -382,8 +396,17 @@ def recommend(
         # "window years" (recent->old, inheriting years_rows' order) are what we fall back
         # to for the Open/Close display when no year was strictly in range.
         window = [(y, o, c) for (y, _r, o, c) in years_rows if lo <= c <= hi]
+        padded = False
         if not window:
-            continue
+            # Not selected by the window. It can still be a padding candidate ("safer
+            # option") when its recency-weighted closing rank is above the window.
+            above = [(y, o, c) for (y, _r, o, c) in years_rows if c > hi]
+            wc = _recency_weighted(
+                [(y, float(c)) for (y, _r, _o, c) in years_rows], ref_year
+            )
+            if not above or wc is None or wc <= hi:
+                continue
+            window, padded = above, True
         window_years = [y for (y, _o, _c) in window]
 
         # Open/Close summarise a band of years: the in-range years if the rank fell inside
@@ -449,11 +472,22 @@ def recommend(
                 rank_closing=rank_closing,
                 rank_opening=rank_opening,
                 closing_rank_trend=trend,
+                padded=padded,
             )
         )
 
-    _assign_scores(recs)
-    recs.sort(key=_order_key)
+    in_window = [r for r in recs if not r.padded]
+    pads = [r for r in recs if r.padded]
+    # Pad up to MIN_RESULTS with the nearest programs above the window (stable sort keeps
+    # the dataset order on ties). Each group is scored among itself, then ordered by score;
+    # padded rows always follow the in-window rows.
+    pads.sort(key=lambda r: r.rank_closing)
+    pads = pads[: max(0, MIN_RESULTS - len(in_window))]
+    _assign_scores(in_window)
+    _assign_scores(pads)
+    in_window.sort(key=_order_key)
+    pads.sort(key=_order_key)
+    recs = in_window + pads
     if limit is not None:
         recs = recs[:limit]
     return recs

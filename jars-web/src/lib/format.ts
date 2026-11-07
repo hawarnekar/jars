@@ -17,7 +17,7 @@ export function fmtYears(years: number[], reach: boolean): string {
 }
 
 export function fmtBandYears(r: Recommendation): string {
-  return fmtYears(bandYears(r), !bandInRange(r));
+  return fmtYears(bandYears(r), !(bandInRange(r) || r.padded));
 }
 
 export function fmtChance(feasibility: number): string {

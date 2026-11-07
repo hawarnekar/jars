@@ -67,9 +67,13 @@ def test_both_ranks_returns_mixed(engine):
 
 def test_both_ranks_sorted_by_score(engine):
     recs = engine.recommend(5000, jee_adv_rank=500, jee_mains_rank=4000)
-    scores = [r.score for r in recs]
-    assert scores == sorted(scores, reverse=True)
-    assert all(0.0 <= s <= 1.0 for s in scores)
+    # In-window rows are ordered by score; padded ("safer option") rows follow them.
+    flags = [r.padded for r in recs]
+    assert flags == sorted(flags)
+    for group in (False, True):
+        scores = [r.score for r in recs if r.padded is group]
+        assert scores == sorted(scores, reverse=True)
+        assert all(0.0 <= s <= 1.0 for s in scores)
 
 
 def test_neither_rank_raises(engine):
@@ -81,7 +85,8 @@ def test_window_filters_by_closing_rank(engine):
     recs = engine.recommend(100, jee_adv_rank=250)
     assert recs
     for r in recs:
-        assert 150 <= r.cutoff.closing_rank <= 350
+        if not r.padded:
+            assert 150 <= r.cutoff.closing_rank <= 350
 
 
 def test_seat_type_filter(engine):
@@ -505,3 +510,27 @@ def test_yearly_reps_merges_all_rounds_every_year():
     assert cse.loc[2026, "round"] == 2
     ece = reps[reps.program_name == "ECE"].iloc[0]
     assert (ece.opening_rank, ece.closing_rank, ece["round"]) == (10, 50, 1)
+
+
+def test_pads_to_minimum_with_nearest_programs_above_window(engine):
+    """Sparse window -> pad to MIN_RESULTS with the nearest programs closing above it."""
+    from jars_lib.recommend import MIN_RESULTS
+
+    everything = engine.recommend(10**7, jee_adv_rank=30)  # window covers all programs
+    recs = engine.recommend(10, jee_adv_rank=30)  # window is 20..40
+    assert len(recs) == min(MIN_RESULTS, len(everything))
+    in_win = [r for r in recs if not r.padded]
+    pads = [r for r in recs if r.padded]
+    assert pads and len(in_win) < MIN_RESULTS
+    assert recs[: len(in_win)] == in_win  # padded rows always follow
+    for r in pads:
+        assert r.rank_closing > 40  # above the window, never a reach
+        assert r.window_years  # years that justify the padding
+    # Nearest-first: no unchosen program closes closer than the farthest padded one.
+    above = sorted(r.rank_closing for r in everything if r.rank_closing > 40)
+    assert sorted(r.rank_closing for r in pads) == above[: len(pads)]
+
+
+def test_no_padding_when_window_is_full(engine):
+    recs = engine.recommend(100000, jee_mains_rank=4000)
+    assert not any(r.padded for r in recs)

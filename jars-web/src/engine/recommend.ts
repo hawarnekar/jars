@@ -22,7 +22,7 @@ import {
   feasibility,
   recencyWeighted,
 } from "./scoring";
-import type { Cutoff, Recommendation, RecommendParams } from "./types";
+import { MIN_RESULTS, type Cutoff, type Recommendation, type RecommendParams } from "./types";
 
 /** recommend.py:_gender_pool — seat-pool genders a candidate may compete in. */
 function genderPool(gender: string): Set<string> {
@@ -98,8 +98,20 @@ function recommendFamily(
     const inRange = years.filter(([, , o, c]) => rank <= c && (o === null || o <= rank));
     const inRangeYears = inRange.map(([y]) => y);
 
-    const window = years.filter(([, , , c]) => lo <= c && c <= hi);
-    if (window.length === 0) continue;
+    let window = years.filter(([, , , c]) => lo <= c && c <= hi);
+    let padded = false;
+    if (window.length === 0) {
+      // Not selected by the window: a padding candidate ("safer option") only when its
+      // recency-weighted closing rank is above the window.
+      const above = years.filter(([, , , c]) => c > hi);
+      const wc = recencyWeighted(
+        years.map(([y, , , c]) => [y, c] as [number, number]),
+        refYear,
+      );
+      if (above.length === 0 || wc === null || wc <= hi) continue;
+      window = above;
+      padded = true;
+    }
     const windowYears = window.map(([y]) => y);
 
     const band = inRange.length ? inRange : window;
@@ -163,12 +175,22 @@ function recommendFamily(
       rank_opening: rankOpening,
       score: 0.0,
       closing_rank_trend: trend,
+      padded,
     });
   }
 
-  assignScores(recs);
-  recs.sort(compareOrder); // Array.prototype.sort is stable (ES2019+).
-  return recs;
+  // Pad up to MIN_RESULTS with the nearest programs above the window (stable sort keeps the
+  // dataset order on ties). Each group is scored among itself, then ordered by score;
+  // padded rows always follow the in-window rows.
+  const inWindow = recs.filter((r) => !r.padded);
+  let pads = recs.filter((r) => r.padded);
+  pads.sort((a, b) => (a.rank_closing as number) - (b.rank_closing as number));
+  pads = pads.slice(0, Math.max(0, MIN_RESULTS - inWindow.length));
+  assignScores(inWindow);
+  assignScores(pads);
+  inWindow.sort(compareOrder); // Array.prototype.sort is stable (ES2019+).
+  pads.sort(compareOrder);
+  return inWindow.concat(pads);
 }
 
 function intersect(a: ReadonlySet<string>, b: Set<string>): Set<string> {
@@ -210,7 +232,7 @@ export function recommend(ds: Dataset, params: RecommendParams): Recommendation[
       recs = recs.concat(recommendFamily(ds, mains, params.rankRange, { ...common, instituteTypes: nonIit }));
   }
 
-  recs.sort(compareOrder);
+  recs.sort((a, b) => Number(a.padded) - Number(b.padded) || compareOrder(a, b));
   if (params.limit != null) recs = recs.slice(0, params.limit);
   return recs;
 }

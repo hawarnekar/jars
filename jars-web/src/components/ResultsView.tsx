@@ -25,11 +25,31 @@ import { RowDetail } from "./RowDetail";
 
 const col = createColumnHelper<Recommendation>();
 
+const SAFER_TITLE =
+  "Closes above your rank range, so you would very likely get it. Added because few programs fell inside your range.";
+
+/** Badge for a padded row — a program closing above the ±range window. */
+function SaferBadge() {
+  return (
+    <span
+      title={SAFER_TITLE}
+      className="ml-2 whitespace-nowrap rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+    >
+      Safer option
+    </span>
+  );
+}
+
 const columns = [
   col.accessor((r) => r.cutoff.institute_name, {
     id: "institute",
     header: "Institute",
-    cell: (c) => <span className="font-medium">{c.getValue()}</span>,
+    cell: (c) => (
+      <>
+        <span className="font-medium">{c.getValue()}</span>
+        {c.row.original.padded && <SaferBadge />}
+      </>
+    ),
   }),
   col.accessor((r) => r.cutoff.program_name, { id: "program", header: "Program" }),
   col.accessor((r) => r.cutoff.seat_type, { id: "category", header: "Category" }),
@@ -106,9 +126,19 @@ export function ResultsView({ results, dataset }: Props) {
   });
 
   const rows = table.getRowModel().rows;
+  const saferCount = results.filter((r) => r.padded).length;
 
   return (
     <div>
+      {saferCount > 0 && (
+        <p className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
+          {results.length - saferCount === 0
+            ? "No programs closed within your rank range. "
+            : `Only ${results.length - saferCount} program(s) closed within your rank range. `}
+          Showing the {saferCount} nearest <strong>safer options</strong> that close above it —
+          you would very likely get these.
+        </p>
+      )}
       {/* Desktop / tablet: table */}
       <div className="hidden overflow-x-auto rounded-lg border border-slate-200 md:block dark:border-slate-800">
         <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
@@ -172,7 +202,10 @@ export function ResultsView({ results, dataset }: Props) {
                 className="w-full text-left"
                 onClick={row.getToggleExpandedHandler()}
               >
-                <div className="font-medium">{r.cutoff.institute_name}</div>
+                <div className="font-medium">
+                  {r.cutoff.institute_name}
+                  {r.padded && <SaferBadge />}
+                </div>
                 <div className="text-sm text-slate-600 dark:text-slate-300">
                   {r.cutoff.program_name}
                 </div>

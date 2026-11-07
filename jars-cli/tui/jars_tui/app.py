@@ -267,8 +267,10 @@ class RecoApp(App):
                 f"Mains {mains_rank}" if mains_rank else "",
             ] if p
         )
+        safer = sum(r.padded for r in recs)
+        safer_note = f" ({safer} ↑ safer options above your range)" if safer else ""
         self.query_one("#status", Static).update(
-            f"{len(recs)} matches · {rank_info} ±{rng} · {category} · "
+            f"{len(recs)} matches{safer_note} · {rank_info} ±{rng} · {category} · "
             "ranked by score (NIRF » closing » opening)"
         )
 
@@ -301,7 +303,8 @@ class RecoApp(App):
 
         for r in recs:
             c = r.cutoff
-            inst_lines = _wrap_cell(c.institute_name, inst_w)
+            # "↑" flags a safer option: closes above the rank window (padded result).
+            inst_lines = _wrap_cell(("↑ " if r.padded else "") + c.institute_name, inst_w)
             prog_lines = _wrap_cell(c.program_name, prog_w)
             row_height = max(len(inst_lines), len(prog_lines))
             table.add_row(
@@ -311,7 +314,7 @@ class RecoApp(App):
                 c.quota,
                 _fmt_rank_year(r.opening_rank_min, r.opening_rank_min_year),
                 _fmt_rank_year(r.closing_rank_max, r.closing_rank_max_year),
-                _fmt_years(r.band_years, reach=not r.band_in_range),
+                _fmt_years(r.band_years, reach=not (r.band_in_range or r.padded)),
                 str(r.nirf_rank) if r.nirf_rank else "unranked",
                 f"{r.feasibility * 100:.0f}%",
                 r.closing_rank_trend or "-",

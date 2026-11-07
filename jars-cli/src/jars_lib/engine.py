@@ -32,7 +32,7 @@ from .constants import GENDER_NEUTRAL, IIT_TYPES, NON_IIT_TYPES
 from .match import nirf_lookup
 from .models import NirfScore, Recommendation
 from .recommend import recommend as _recommend
-from .recommend import _order_key
+from .recommend import _final_key
 from . import storage
 
 
@@ -129,7 +129,7 @@ class RecoEngine:
                     **common,
                 )
 
-        recs.sort(key=_order_key)
+        recs.sort(key=_final_key)
         if limit is not None:
             recs = recs[:limit]
         return recs

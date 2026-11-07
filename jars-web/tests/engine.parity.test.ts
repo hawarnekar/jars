@@ -62,6 +62,7 @@ interface GoldenRow {
   closing_rank_max: number | null;
   closing_rank_max_year: number | null;
   closing_rank_trend: string | null;
+  padded: boolean;
 }
 
 function toParams(spec: GoldenSpec): RecommendParams {
@@ -126,6 +127,7 @@ describe("TS engine parity with jars_lib golden output", () => {
         expect(r.closing_rank_max, `${where} closing_rank_max`).toBe(g.closing_rank_max);
         expect(r.closing_rank_max_year, `${where} closing_rank_max_year`).toBe(g.closing_rank_max_year);
         expect(r.closing_rank_trend, `${where} trend`).toBe(g.closing_rank_trend);
+        expect(r.padded, `${where} padded`).toBe(g.padded);
 
         // Floats — within rounding tolerance.
         approx(r.score, g.score, TOL_SCORE, `${where} score`);

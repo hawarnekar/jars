@@ -222,6 +222,11 @@ _GOLDEN_SPECS: list[dict[str, Any]] = [
     {"rank_range": 10000, "jee_mains_rank": 5000, "seat_type": "OPEN"},
     {"rank_range": 2000, "jee_adv_rank": 500},
     {"rank_range": 4000, "jee_mains_rank": 250000, "seat_type": "OPEN"},
+    # Sparse windows: padded up to MIN_RESULTS with the nearest programs above the window.
+    {"rank_range": 10, "jee_adv_rank": 30, "institute_types": ["IIT"]},
+    {"rank_range": 100, "jee_adv_rank": 30, "institute_types": ["IIT"]},
+    {"rank_range": 10, "jee_adv_rank": 30, "jee_mains_rank": 350},
+    {"rank_range": 10, "jee_adv_rank": 30, "institute_types": ["IIT"], "year": 2024},
     {
         "rank_range": 3000,
         "jee_adv_rank": 6000,

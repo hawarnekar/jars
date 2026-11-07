@@ -56,7 +56,8 @@ class Recommendation:
       that year's opening..closing band — i.e. years they would have secured a seat. It is
       empty for a "reach" the rank never cleared.
     * ``window_years`` lists the years (recent→old) the program's closing rank fell within
-      the candidate's ±range window — the selection years. Always non-empty.
+      the candidate's ±range window — the selection years. Always non-empty (for a
+      ``padded`` row it lists the years whose closing rank was above the window).
     * ``opening_rank_min`` / ``closing_rank_max`` summarise a band of years — the best
       (smallest) opening rank and the worst (largest) closing rank, each with its year.
       The band is the in-range years when there are any, otherwise the window years (so a
@@ -67,6 +68,11 @@ class Recommendation:
     * ``score`` is the weighted ranking score in [0, 1] (higher is better): a blend of NIRF
       rank, ``rank_closing``, and ``rank_opening`` goodness, weighted in that priority.
       Results are sorted by it. See :func:`jars_lib.recommend.recommend`.
+
+    * ``padded`` marks a "safer option": a program whose closing rank sits *above* the
+      candidate's ±range window (so the candidate is very likely to get it). These are added
+      only when fewer than ``MIN_RESULTS`` programs fall inside the window, nearest first.
+      For them ``window_years`` holds the years whose closing rank was above the window.
 
     ``cutoff`` carries the most-recent year's row for identity/back-reference.
     """
@@ -85,6 +91,7 @@ class Recommendation:
     rank_opening: float | None = None
     score: float = 0.0
     closing_rank_trend: str | None = None
+    padded: bool = False
 
     @property
     def band_in_range(self) -> bool:
@@ -116,5 +123,6 @@ class Recommendation:
             rank_closing=round(self.rank_closing, 1) if self.rank_closing is not None else None,
             rank_opening=round(self.rank_opening, 1) if self.rank_opening is not None else None,
             closing_rank_trend=self.closing_rank_trend,
+            padded=self.padded,
         )
         return d

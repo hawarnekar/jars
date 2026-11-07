@@ -88,6 +88,11 @@ priority), a large advantage on a lower-weighted term can outweigh a small disad
 higher-weighted one. The "Chance" column still shows the recency-weighted admit likelihood
 for context, but does not affect order.
 
+**Safer options.** If fewer than 10 programs close inside your `±range` window, the list is
+padded up to 10 with the nearest programs that close *above* the window — ones you would very
+likely get. They follow the in-window rows and are marked `*` (CLI), `↑` (TUI) or a "Safer
+option" badge (web). Programs closing below your window (reaches) are never added.
+
 ### Download real JoSAA data from the web
 
 ```bash

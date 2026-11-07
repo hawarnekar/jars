@@ -81,7 +81,12 @@ export interface Recommendation {
   rank_opening: number | null;
   score: number;
   closing_rank_trend: string | null;
+  /** A "safer option": closes above the ±range window; added only to pad sparse results. */
+  padded: boolean;
 }
+
+/** Minimum result count: sparse windows are padded up to this many (mirror of MIN_RESULTS). */
+export const MIN_RESULTS = 10;
 
 /** True when Open/Close/`bandYears` reflect in-range years; false for the reach fallback. */
 export function bandInRange(r: Recommendation): boolean {
