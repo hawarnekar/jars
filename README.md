@@ -3,6 +3,9 @@
 **jars** recommends engineering colleges and programs from your JEE rank, using historical
 JoSAA opening/closing ranks (IITs, NITs, IIITs, GFTIs) and NIRF Engineering rankings.
 
+| _Live website: **https://hawarnekar.github.io/jars/**_ |
+| ---------------------------------------------------- |
+
 This repository is a monorepo with two front-ends over the same recommendation logic:
 
 | Directory | What it is |
@@ -11,8 +14,6 @@ This repository is a monorepo with two front-ends over the same recommendation l
 | [`jars-web/`](jars-web/) | A static web UI hosted on GitHub Pages. The recommendation engine is ported to TypeScript and runs entirely in the browser against a compact dataset pre-built from `jars-cli`. |
 
 ## Web app
-
-Live site: **https://hawarnekar.github.io/jars/**
 
 The web app is **read-only**: it has no scraper or "update" action. Its dataset is generated
 offline from `jars-cli` and committed to the repo. To refresh the published data:
