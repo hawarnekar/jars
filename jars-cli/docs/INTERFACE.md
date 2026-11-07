@@ -106,7 +106,7 @@ engine.recommend(
 | `home_state` | `str \| None` | When provided, HS quota is returned for institutes located in that state and OS quota for all others. When `None`, both HS and OS rows are included. |
 | `institute_types` | `set[str] \| None` | Restrict to a subset of `{"IIT", "NIT", "IIIT", "GFTI"}`; `None` = all |
 | `year` | `int \| None` | Pin to a specific cutoff year; `None` (default) considers all years |
-| `round` | `int \| None` | Pin to a specific counselling round; `None` (default) uses each year's highest round |
+| `round` | `int \| None` | Pin to a specific counselling round; `None` (default) merges all rounds of each year (min opening, max closing) |
 | `limit` | `int \| None` | Cap the number of results returned |
 
 **Returns** a list of `Recommendation` objects sorted by `score` descending (see the

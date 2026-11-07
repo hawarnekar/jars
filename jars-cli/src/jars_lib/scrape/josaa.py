@@ -36,6 +36,14 @@ ARCHIVE_URL = (
     "openingclosingrankarchieve.aspx"
 )
 
+# Current-cycle page: same form as the archive but with no Year dropdown (the year is
+# implied by the page's "Academic Year 2026-27" banner). Used while counselling is live,
+# before JoSAA moves the year into the archive.
+CURRENT_URL = (
+    "https://josaa.admissions.nic.in/applicant/SeatAllotmentResult/CurrentORCR.aspx"
+)
+_ACADEMIC_YEAR = re.compile(r"Academic\s+Year\s+(\d{4})")
+
 # Header text -> canonical column. Matching is case-insensitive substring.
 _HEADER_MAP = (
     ("institute", "institute_name"),

@@ -184,6 +184,7 @@ def cmd_update(args: argparse.Namespace) -> int:
         progress=lambda msg: print(msg),
         force=args.force,
         resume=args.resume,
+        current=args.current,
     )
     return 0
 
@@ -271,6 +272,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--resume",
         action="store_true",
         help="skip (year, round, type) combinations already in the store and merge new rows",
+    )
+    u.add_argument(
+        "--current",
+        action="store_true",
+        help="scrape the live current-year JoSAA page (for a year not yet in the "
+        "archive); merges into the store, implies --resume, playwright only",
     )
     u.set_defaults(func=cmd_update)
 

@@ -478,3 +478,30 @@ def test_cli_keyboard_interrupt_exits_130(tmp_path, monkeypatch):
     from jars_lib.cli import main
     with mock.patch("jars_lib.cli.update_database", side_effect=KeyboardInterrupt):
         assert main(["update"]) == 130
+
+
+def test_yearly_reps_merges_all_rounds_every_year():
+    """Every year merges all rounds (min opening, max closing), incl. programs absent later."""
+    import pandas as pd
+
+    from jars_lib.recommend import _yearly_reps
+
+    base = dict(
+        institute_type="NIT", institute_name="NIT X", program_name="CSE",
+        quota="AI", seat_type="OPEN", gender=GENDER_NEUTRAL,
+    )
+    rows = [
+        dict(base, year=2025, round=1, opening_rank=100, closing_rank=500),
+        dict(base, year=2025, round=2, opening_rank=300, closing_rank=700),
+        dict(base, year=2026, round=1, opening_rank=120, closing_rank=520),
+        dict(base, year=2026, round=2, opening_rank=330, closing_rank=730),
+        # Fills up in round 1 and never appears again.
+        dict(base, program_name="ECE", year=2025, round=1, opening_rank=10, closing_rank=50),
+    ]
+    reps = _yearly_reps(pd.DataFrame(rows))
+    cse = reps[reps.program_name == "CSE"].set_index("year")
+    assert (cse.loc[2025, "opening_rank"], cse.loc[2025, "closing_rank"]) == (100, 700)
+    assert (cse.loc[2026, "opening_rank"], cse.loc[2026, "closing_rank"]) == (120, 730)
+    assert cse.loc[2026, "round"] == 2
+    ece = reps[reps.program_name == "ECE"].iloc[0]
+    assert (ece.opening_rank, ece.closing_rank, ece["round"]) == (10, 50, 1)

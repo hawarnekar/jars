@@ -99,7 +99,15 @@ jars-lib update --years 2024 --rounds 1 --types IIT
 
 # Watch the browser window while it scrapes:
 jars-lib update --years 2024 --show-browser
+
+# Current counselling cycle, before JoSAA archives it (merges into the store;
+# implies --resume; the year is read from the page banner; playwright only):
+jars-lib update --current --nirf-year 2025
 ```
+
+`--current` scrapes `SeatAllotmentResult/CurrentORCR.aspx`, which has no Year dropdown. Rounds
+already stored for that year are skipped, so re-run it as new rounds are published. Once JoSAA
+adds the year to the archive, `--years <year>` works as usual.
 
 ### Check what is stored locally
 

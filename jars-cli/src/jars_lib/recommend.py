@@ -269,17 +269,27 @@ def _filter(
 
 
 def _yearly_reps(df: pd.DataFrame) -> pd.DataFrame:
-    """Reduce to one row per (program key, year): the highest round that has a closing rank.
+    """Reduce to one row per (program key, year), merging all counselling rounds.
 
-    JoSAA publishes several rounds per year; the final round is the settled cutoff, so we
-    keep the max-round row for each program/year.
+    JoSAA publishes several rounds per year, and a program that fills up in the early
+    rounds may have no row at all in the last round. So instead of keeping only the final
+    round, every round is merged into one band: the smallest opening rank and the largest
+    closing rank seen in any round. The ``round`` of the row is the highest round in which
+    the program appeared.
     """
     d = df.dropna(subset=["closing_rank"])
     if d.empty:
         return d
     d = d.reset_index(drop=True)
-    keep = d.groupby(_KEY_COLS + ["year"])["round"].idxmax()
-    return d.loc[keep]
+    reps = d.loc[d.groupby(_KEY_COLS + ["year"])["round"].idxmax()].copy()
+    merged = d.groupby(_KEY_COLS + ["year"]).agg(
+        _open=("opening_rank", "min"), _close=("closing_rank", "max")
+    )
+    keys = pd.MultiIndex.from_frame(reps[_KEY_COLS + ["year"]])
+    vals = merged.reindex(keys)
+    reps["opening_rank"] = vals["_open"].to_numpy()
+    reps["closing_rank"] = vals["_close"].to_numpy()
+    return reps
 
 
 def recommend(

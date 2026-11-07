@@ -15,7 +15,7 @@ export function RowDetail({ rec, dataset }: Props) {
       <div className="grid gap-4 md:grid-cols-[1fr_auto]">
         <div>
           <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            Year-by-year cutoffs (final round)
+            Year-by-year cutoffs (all rounds merged)
           </h4>
           <div className="overflow-x-auto">
             <table className="text-xs">

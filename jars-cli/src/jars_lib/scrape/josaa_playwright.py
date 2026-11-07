@@ -22,7 +22,9 @@ import pandas as pd
 from ..constants import CUTOFF_COLUMNS
 from .errors import ScrapeError
 from .josaa import (
+    _ACADEMIC_YEAR,
     ARCHIVE_URL,
+    CURRENT_URL,
     _ALL_OPTION,
     _canonical_type,
     _rank_to_int,
@@ -168,6 +170,7 @@ class PlaywrightJosaaScraper:
         progress=None,
         skip_done: set[tuple[int, int, str]] | None = None,
         on_round_complete: Callable[[list[dict]], None] | None = None,
+        current: bool = False,
     ) -> Iterator[dict]:
         """Yield cutoff row dicts across the requested cross-product.
 
@@ -175,7 +178,10 @@ class PlaywrightJosaaScraper:
         already present in the store; matching leaves are silently skipped (resume mode).
         ``on_round_complete`` is called with all rows from a completed (year, round) pair
         so the caller can checkpoint incrementally.
+        ``current`` scrapes the live current-cycle page (no Year dropdown) instead of the
+        archive; the year is read from the page banner and ``years`` is ignored.
         """
+        url = CURRENT_URL if current else ARCHIVE_URL
         sync_playwright = self._sync_playwright
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=self.headless)
@@ -185,10 +191,25 @@ class PlaywrightJosaaScraper:
                 # The initial navigation is the most failure-prone step (cold DNS, a slow
                 # first byte); retry it on a Playwright timeout before giving up.
                 with_retry(
-                    lambda: page.goto(ARCHIVE_URL, wait_until="load"),
+                    lambda: page.goto(url, wait_until="load"),
                     is_transient=lambda exc: isinstance(exc, self._PWTimeout),
-                    description=f"loading {ARCHIVE_URL}",
+                    description=f"loading {url}",
                 )
+
+                if current:
+                    m = _ACADEMIC_YEAR.search(page.inner_text("body"))
+                    if not m:
+                        raise ScrapeError(
+                            "could not determine the academic year on the JoSAA "
+                            "current-year page; its layout may have changed"
+                        )
+                    year = m.group(1)
+                    yield from self._crawl_year(
+                        page, year, year, rounds, institute_types, progress,
+                        skip_done=skip_done,
+                        on_round_complete=on_round_complete,
+                    )
+                    return
 
                 selects = self._discover_selects(page)
                 year_sel = self._find(selects, "year")
@@ -293,6 +314,7 @@ def scrape_cutoffs_playwright(
     progress=None,
     checkpoint_fn: Callable[[list[dict]], None] | None = None,
     skip_done: set[tuple[int, int, str]] | None = None,
+    current: bool = False,
 ) -> pd.DataFrame:
     """Crawl the archive with a headless browser and return a cutoffs DataFrame.
 
@@ -312,6 +334,7 @@ def scrape_cutoffs_playwright(
         progress=leaf_progress,
         skip_done=skip_done,
         on_round_complete=checkpoint_fn,
+        current=current,
     ):
         rows.append(row)
     if scraper.skipped_leaves:

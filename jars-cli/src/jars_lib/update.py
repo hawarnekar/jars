@@ -44,6 +44,7 @@ def update_database(
     progress: ProgressFn | None = None,
     force: bool = False,
     resume: bool = False,
+    current: bool = False,
 ) -> dict:
     """Scrape JoSAA cutoffs + NIRF rankings and persist them. Returns the new meta.
 
@@ -56,7 +57,15 @@ def update_database(
         When ``True``, load the existing store first and skip ``(year, round, type)``
         combinations that already have rows. Newly fetched rows are merged with the
         existing data and saved incrementally after each (year, round) completes.
+    current:
+        Scrape the live current-cycle JoSAA page instead of the archive (for a year not
+        yet archived). Requires the Playwright backend and implies ``resume``, so the
+        new rounds are merged into the store rather than replacing it.
     """
+    if current:
+        if backend != "playwright":
+            raise ValueError("current-year scraping requires the playwright backend")
+        resume = True
     paths = (paths or Paths.resolve()).ensure()
 
     def say(msg: str) -> None:
@@ -105,6 +114,7 @@ def update_database(
         progress=lambda n: say(f"  …{n} cutoff rows so far"),
         checkpoint_fn=checkpoint,
         skip_done=skip_done,
+        current=current,
     )
 
     # Empty-overwrite guard: refuse to clobber a populated store with nothing unless
@@ -172,7 +182,8 @@ def _round_counts(df: pd.DataFrame) -> dict[str, int]:
 
 
 def _scrape_cutoffs(backend, years, rounds, institute_types, *, delay, headless,
-                    progress, checkpoint_fn, skip_done):
+                    progress, checkpoint_fn, skip_done,
+                    current=False):
     """Dispatch to the chosen JoSAA backend."""
     if backend == "playwright":
         from .scrape.josaa_playwright import scrape_cutoffs_playwright
@@ -183,6 +194,7 @@ def _scrape_cutoffs(backend, years, rounds, institute_types, *, delay, headless,
             progress=progress,
             checkpoint_fn=checkpoint_fn,
             skip_done=skip_done,
+            current=current,
         )
     if backend == "httpx":
         from .scrape.josaa import scrape_cutoffs
